@@ -1,34 +1,31 @@
-﻿using CLIENT.View;
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Text;
+using System.Windows.Forms;
 
 namespace CLIENT.View
 {
-    public partial class frmConnect : Form
+    public partial class frmConnected : Form
     {
-        public frmConnect()
+        public frmConnected()
         {
             InitializeComponent();
-        }
-
-        private void frmConnect_Load(object sender, EventArgs e)
-        {
-
         }
 
         private void btnConnect_Click(object sender, EventArgs e)
         {
             try
             {
-                while (true)
-                {
-                    ClientSocketConnect client = new ClientSocketConnect();
-                    int port = int.Parse(textNumPort.Text);
-                    client.Connect(port);
-                    this.Hide();
+                ClientSocketConnect client = new ClientSocketConnect();
+                int port = int.Parse(textNumPort.Text);
+                client.Connect(port);
+                this.Hide();
 
-                    frmLogin loginForm = new frmLogin();
-                    loginForm.Show();
-                    break;
-                }
+                frmLogin loginForm = new frmLogin();
+                loginForm.Show();
             }
             catch (FormatException)
             {
@@ -39,7 +36,5 @@ namespace CLIENT.View
                 MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi kết nối!", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
-        
     }
 }

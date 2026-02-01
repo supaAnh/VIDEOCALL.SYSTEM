@@ -5,8 +5,8 @@ using System.Data;
 using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
-
-namespace CLIENT.View
+using CLIENT.View;
+namespace CLIENT
 {
     public partial class frmConnected : Form
     {

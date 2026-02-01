@@ -1,4 +1,4 @@
-﻿namespace CLIENT.View
+﻿namespace CLIENT
 {
     partial class frmConnected
     {

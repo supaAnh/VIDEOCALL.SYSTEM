@@ -1,10 +1,13 @@
-﻿namespace SERVER
+﻿using SERVER.LogUI;
+
+namespace SERVER
 {
     public partial class frmMain : Form
     {
         public frmMain()
         {
             InitializeComponent();
+            SERVER.LogUI.LogViewUI.Initialize(this.listViewHistory);
         }
         private void frmMain_Load(object sender, EventArgs e)
         {
@@ -23,11 +26,11 @@
                 SocketConnect server = new SocketConnect();
                 int port = int.Parse(textNumPort.Text);
                 server.StartServer(port);
-                MessageBox.Show($"Đã khởi động Server ở port: {port}", "Server đã chạy");
+                LogViewUI.AddLog($"Đã khởi động Server ở port: {port}");
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Lỗi khi mở Server: " + ex.Message);
+                LogViewUI.AddLog("Lỗi khi mở Server: " + ex.Message);
             }
         }
 

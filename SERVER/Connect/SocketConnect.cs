@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SERVER.LogUI;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http.Headers;
@@ -35,7 +36,8 @@ public class SocketConnect
                     Thread receive = new Thread(ReceiveData);
                     receive.IsBackground = true;
                     receive.Start(client);
-                    MessageBox.Show($" [{client.RemoteEndPoint.ToString()}]: đã kết nối" , "Client kết nối");
+                    LogViewUI.AddLog($" [{client.RemoteEndPoint.ToString()}]: đã kết nối");
+
                 }
             }
             catch (Exception ex)

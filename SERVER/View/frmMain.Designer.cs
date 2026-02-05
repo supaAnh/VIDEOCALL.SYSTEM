@@ -30,6 +30,8 @@
         {
             btnExit = new Button();
             listViewHistory = new ListView();
+            columnHeader1 = new ColumnHeader();
+            columnHeader2 = new ColumnHeader();
             btnConnect = new Button();
             label1 = new Label();
             textNumPort = new NumericUpDown();
@@ -55,12 +57,24 @@
             // listViewHistory
             // 
             listViewHistory.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            listViewHistory.Columns.AddRange(new ColumnHeader[] { columnHeader1, columnHeader2 });
+            listViewHistory.Font = new Font("Segoe UI", 10F);
             listViewHistory.Location = new Point(-2, 255);
             listViewHistory.Name = "listViewHistory";
             listViewHistory.Size = new Size(577, 290);
             listViewHistory.TabIndex = 1;
             listViewHistory.UseCompatibleStateImageBehavior = false;
             listViewHistory.View = View.Details;
+            // 
+            // columnHeader1
+            // 
+            columnHeader1.Text = "Thời gian";
+            columnHeader1.Width = 110;
+            // 
+            // columnHeader2
+            // 
+            columnHeader2.Text = "Hành động";
+            columnHeader2.Width = 500;
             // 
             // btnConnect
             // 
@@ -160,5 +174,7 @@
         private ListView listViewClientConnected;
         private Button btnClientOut;
         private Label label2;
+        private ColumnHeader columnHeader1;
+        private ColumnHeader columnHeader2;
     }
 }

@@ -36,8 +36,8 @@
             label1 = new Label();
             textNumPort = new NumericUpDown();
             listViewClientConnected = new ListView();
+            columnHeader3 = new ColumnHeader();
             btnClientOut = new Button();
-            label2 = new Label();
             ((System.ComponentModel.ISupportInitialize)textNumPort).BeginInit();
             SuspendLayout();
             // 
@@ -111,13 +111,18 @@
             // 
             // listViewClientConnected
             // 
-            listViewClientConnected.Location = new Point(221, 37);
+            listViewClientConnected.Columns.AddRange(new ColumnHeader[] { columnHeader3 });
+            listViewClientConnected.Location = new Point(206, 12);
             listViewClientConnected.Name = "listViewClientConnected";
-            listViewClientConnected.Size = new Size(340, 150);
+            listViewClientConnected.Size = new Size(340, 175);
             listViewClientConnected.TabIndex = 6;
             listViewClientConnected.UseCompatibleStateImageBehavior = false;
             listViewClientConnected.View = View.Details;
-            listViewClientConnected.SelectedIndexChanged += listViewClientConnected_SelectedIndexChanged;
+            // 
+            // columnHeader3
+            // 
+            columnHeader3.Text = "Người dùng đang Online";
+            columnHeader3.Width = 350;
             // 
             // btnClientOut
             // 
@@ -131,22 +136,11 @@
             btnClientOut.Text = "Xoá Client";
             btnClientOut.UseVisualStyleBackColor = false;
             // 
-            // label2
-            // 
-            label2.AutoSize = true;
-            label2.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            label2.Location = new Point(221, 11);
-            label2.Name = "label2";
-            label2.Size = new Size(255, 23);
-            label2.TabIndex = 8;
-            label2.Text = "Danh sách Client đang kết nối:";
-            // 
             // frmMain
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(573, 546);
-            Controls.Add(label2);
             Controls.Add(btnClientOut);
             Controls.Add(listViewClientConnected);
             Controls.Add(textNumPort);
@@ -174,8 +168,8 @@
         private NumericUpDown textNumPort;
         private ListView listViewClientConnected;
         private Button btnClientOut;
-        private Label label2;
         private ColumnHeader columnHeader1;
         private ColumnHeader columnHeader2;
+        private ColumnHeader columnHeader3;
     }
 }

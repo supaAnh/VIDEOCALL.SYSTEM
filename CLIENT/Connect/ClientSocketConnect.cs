@@ -9,8 +9,9 @@ public class ClientSocketConnect
     private Socket client;
     private byte[] buffer = new byte[1024 * 5000]; // 5MB
 
+
     // Sự kiện để báo về Form khi có tin nhắn mới
-    public event Action<string> OnDataReceived;
+    public event Action<byte[]> OnRawDataReceived;
     // Sự kiện báo mất kết nối
     public event Action OnDisconnected;
 
@@ -46,12 +47,12 @@ public class ClientSocketConnect
             int received = client.EndReceive(ar);
             if (received > 0)
             {
-                string message = Encoding.UTF8.GetString(buffer, 0, received);
+                byte[] data = new byte[received];
+                Array.Copy(buffer, 0, data, 0, received);
 
-                // Bắn sự kiện về Form
-                OnDataReceived?.Invoke(message);
+                // Gửi mảng byte về Form xử lý
+                OnRawDataReceived?.Invoke(data);
 
-                // Tiếp tục đợi gói tin tiếp theo 
                 client.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallback), null);
             }
             else

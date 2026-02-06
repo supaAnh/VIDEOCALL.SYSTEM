@@ -7,7 +7,7 @@ namespace SERVER
         public frmMain()
         {
             InitializeComponent();
-            SERVER.LogUI.LogViewUI.Initialize(this.listViewHistory);
+            LogViewUI.Initialize(this.listViewHistory, this.listViewClientConnected);
         }
         private void frmMain_Load(object sender, EventArgs e)
         {
@@ -34,9 +34,5 @@ namespace SERVER
             }
         }
 
-        private void listViewClientConnected_SelectedIndexChanged(object sender, EventArgs e)
-        {
-
-        }
     }
 }

@@ -10,9 +10,11 @@ namespace CLIENT
 {
     public partial class frmConnected : Form
     {
+        private ClientSocketConnect _client;
         public frmConnected()
         {
             InitializeComponent();
+            
         }
 
         private void btnConnect_Click(object sender, EventArgs e)
@@ -24,7 +26,7 @@ namespace CLIENT
                 client.Connect(port);
                 this.Hide();
 
-                frmLogin loginForm = new frmLogin();
+                frmLogin loginForm = new frmLogin(client);
                 loginForm.Show();
             }
             catch (FormatException)

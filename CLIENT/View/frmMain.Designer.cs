@@ -32,15 +32,16 @@
             lvOnlineUser = new ListView();
             label1 = new Label();
             panelChooseChat = new Panel();
+            btnSignOut = new Button();
             btnCreateGroupChat = new Button();
             btnChooseTarget = new Button();
             panelChatBox = new Panel();
             btnSelectionChatBox = new Button();
             btnCallVideo = new Button();
             lbTargetName = new Label();
-            button2 = new Button();
-            button1 = new Button();
-            textBox2 = new TextBox();
+            btnSendFile = new Button();
+            btnSendChat = new Button();
+            txtChat = new TextBox();
             labelUser = new Label();
             txtChatBox = new TextBox();
             contextMenuStrip1 = new ContextMenuStrip(components);
@@ -48,7 +49,6 @@
             xoáThànhViênToolStripMenuItem = new ToolStripMenuItem();
             xoáCuộcTròChuyệnToolStripMenuItem = new ToolStripMenuItem();
             openFileDialog1 = new OpenFileDialog();
-            btnSignOut = new Button();
             panelChooseChat.SuspendLayout();
             panelChatBox.SuspendLayout();
             contextMenuStrip1.SuspendLayout();
@@ -84,6 +84,15 @@
             panelChooseChat.Size = new Size(262, 489);
             panelChooseChat.TabIndex = 2;
             // 
+            // btnSignOut
+            // 
+            btnSignOut.Location = new Point(77, 436);
+            btnSignOut.Name = "btnSignOut";
+            btnSignOut.Size = new Size(110, 40);
+            btnSignOut.TabIndex = 5;
+            btnSignOut.Text = "Đăng xuất";
+            btnSignOut.UseVisualStyleBackColor = true;
+            // 
             // btnCreateGroupChat
             // 
             btnCreateGroupChat.Location = new Point(139, 389);
@@ -108,9 +117,9 @@
             panelChatBox.Controls.Add(btnSelectionChatBox);
             panelChatBox.Controls.Add(btnCallVideo);
             panelChatBox.Controls.Add(lbTargetName);
-            panelChatBox.Controls.Add(button2);
-            panelChatBox.Controls.Add(button1);
-            panelChatBox.Controls.Add(textBox2);
+            panelChatBox.Controls.Add(btnSendFile);
+            panelChatBox.Controls.Add(btnSendChat);
+            panelChatBox.Controls.Add(txtChat);
             panelChatBox.Controls.Add(labelUser);
             panelChatBox.Controls.Add(txtChatBox);
             panelChatBox.Location = new Point(12, 12);
@@ -153,34 +162,35 @@
             lbTargetName.TabIndex = 5;
             lbTargetName.Text = "Name";
             // 
-            // button2
+            // btnSendFile
             // 
-            button2.BackColor = Color.OldLace;
-            button2.Location = new Point(582, 425);
-            button2.Name = "button2";
-            button2.Size = new Size(67, 54);
-            button2.TabIndex = 4;
-            button2.Text = "File";
-            button2.UseVisualStyleBackColor = false;
+            btnSendFile.BackColor = Color.OldLace;
+            btnSendFile.Location = new Point(582, 425);
+            btnSendFile.Name = "btnSendFile";
+            btnSendFile.Size = new Size(67, 54);
+            btnSendFile.TabIndex = 4;
+            btnSendFile.Text = "File";
+            btnSendFile.UseVisualStyleBackColor = false;
             // 
-            // button1
+            // btnSendChat
             // 
-            button1.BackColor = Color.OldLace;
-            button1.Location = new Point(508, 425);
-            button1.Name = "button1";
-            button1.Size = new Size(67, 54);
-            button1.TabIndex = 3;
-            button1.Text = "Gửi";
-            button1.UseVisualStyleBackColor = false;
+            btnSendChat.BackColor = Color.OldLace;
+            btnSendChat.Location = new Point(508, 425);
+            btnSendChat.Name = "btnSendChat";
+            btnSendChat.Size = new Size(67, 54);
+            btnSendChat.TabIndex = 3;
+            btnSendChat.Text = "Gửi";
+            btnSendChat.UseVisualStyleBackColor = false;
+            btnSendChat.Click += btnSendChat_Click;
             // 
-            // textBox2
+            // txtChat
             // 
-            textBox2.BackColor = Color.OldLace;
-            textBox2.Location = new Point(32, 425);
-            textBox2.Multiline = true;
-            textBox2.Name = "textBox2";
-            textBox2.Size = new Size(470, 54);
-            textBox2.TabIndex = 2;
+            txtChat.BackColor = Color.OldLace;
+            txtChat.Location = new Point(32, 425);
+            txtChat.Multiline = true;
+            txtChat.Name = "txtChat";
+            txtChat.Size = new Size(470, 54);
+            txtChat.TabIndex = 2;
             // 
             // labelUser
             // 
@@ -231,20 +241,11 @@
             // 
             openFileDialog1.FileName = "openFileDialog1";
             // 
-            // btnSignOut
-            // 
-            btnSignOut.Location = new Point(77, 436);
-            btnSignOut.Name = "btnSignOut";
-            btnSignOut.Size = new Size(110, 40);
-            btnSignOut.TabIndex = 5;
-            btnSignOut.Text = "Đăng xuất";
-            btnSignOut.UseVisualStyleBackColor = true;
-            // 
             // frmMain
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1003, 554);
+            ClientSize = new Size(1003, 509);
             Controls.Add(panelChatBox);
             Controls.Add(panelChooseChat);
             Name = "frmMain";
@@ -269,9 +270,9 @@
         private Panel panelChatBox;
         private TextBox txtChatBox;
         private Label lbTargetName;
-        private Button button2;
-        private Button button1;
-        private TextBox textBox2;
+        private Button btnSendFile;
+        private Button btnSendChat;
+        private TextBox txtChat;
         private Label labelUser;
         private Button btnCallVideo;
         private ContextMenuStrip contextMenuStrip1;

@@ -10,9 +10,11 @@ namespace CLIENT.View
 {
     public partial class frmLogin : Form
     {
-        public frmLogin()
+        private ClientSocketConnect _client;
+        public frmLogin(ClientSocketConnect client)
         {
             InitializeComponent();
+            _client = client;
         }
 
         private void frmLogin_Load(object sender, EventArgs e)
@@ -36,7 +38,7 @@ namespace CLIENT.View
         {
             // Xử lý đăng nhập
             btnLogin.Enabled = true;
-            frmMain mainForm = new frmMain();
+            frmMain mainForm = new frmMain(_client);
             mainForm.Show();
             this.Hide();
         }

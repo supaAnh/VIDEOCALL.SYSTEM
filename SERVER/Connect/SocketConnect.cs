@@ -13,7 +13,8 @@ public class SocketConnect
     //Địa chỉ IP và cổng của server
     IPEndPoint IP;
     Socket server;
-    List<Socket> clientList;
+    // Trong SocketConnect.cs
+    private Dictionary<Socket, byte[]> clientKeys = new Dictionary<Socket, byte[]>();
 
 
     //
@@ -21,7 +22,7 @@ public class SocketConnect
     //
     public void StartServer(int port)
     {
-        clientList = new List<Socket>();
+        clientKeys = new Dictionary<Socket, byte[]>();
         IP = new IPEndPoint(IPAddress.Any, port);
         server = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
@@ -53,7 +54,7 @@ public class SocketConnect
             {
                 // Chấp nhận kết nối mới
                 Socket client = server.Accept();
-                clientList.Add(client);
+                SendEncryptionKey(client);
 
                 // --- GỬI KEY NGAY KHI CHẤP NHẬN KẾT NỐI ---
                 SendEncryptionKey(client);
@@ -85,6 +86,10 @@ public class SocketConnect
         // Khóa AES cố định (nên trùng với khóa bạn dự định dùng ở Client)
         byte[] randomKey = CreateKey.GenerateRandomKey();
 
+        lock (clientKeys)
+        {
+            clientKeys[client] = randomKey;
+        }
         // Đóng gói vào DataPackage loại DH_KeyExchange (Loại 6)
         DataPackage keyPackage = new DataPackage(PackageType.DH_KeyExchange, randomKey);
 
@@ -112,24 +117,55 @@ public class SocketConnect
                 Array.Copy(buffer, 0, actualData, 0, received);
                 DataPackage package = DataPackage.Unpack(actualData);
 
-                if (package.Type == PackageType.ChatMessage)
+                if (package.Type == PackageType.ChatMessage || package.Type == PackageType.SecureMessage)
                 {
-                    // Log tin nhắn lên giao diện Server
-                    string msg = Encoding.UTF8.GetString(package.Content);
-                    SERVER.LogUI.LogViewUI.AddLog($"Tin nhắn từ [{client.RemoteEndPoint}]: {msg}");
+                    string displayMsg = "";
+                    if (package.Type == PackageType.SecureMessage)
+                    {
+                        // Tìm khóa AES tương ứng với Socket đang gửi tin nhắn
+                        if (clientKeys.TryGetValue(client, out byte[] key))
+                        {
+                            try
+                            {
+                                // Giải mã tin nhắn sang chuỗi văn bản thuần túy
+                                displayMsg = COMMON.Security.AES_Service.DecryptString(package.Content, key);
+                            }
+                            catch
+                            {
+                                displayMsg = "[Lỗi giải mã]";
+                            }
+                        }
+                        else
+                        {
+                            displayMsg = "[Không tìm thấy khóa bảo mật]";
+                        }
+                    }
+                    else if (package.Type == PackageType.ChatMessage)
+                    {
+                        displayMsg = Encoding.UTF8.GetString(package.Content); 
+                    }
 
+                    SERVER.LogUI.LogViewUI.AddLog($"Tin nhắn từ [{client.RemoteEndPoint}]: {displayMsg}");
                     // Chuyển tiếp cho các Client khác
-                    foreach (Socket item in clientList)
+                    foreach (Socket item in clientKeys.Keys)
                     {
                         if (item != null && item != client && item.Connected)
+                        {
                             item.Send(actualData);
+                        }
                     }
                 }
             }
         }
         catch
         {
-            clientList.Remove(client);
+            lock (clientKeys)
+            {
+                if (clientKeys.ContainsKey(client))
+                {
+                    clientKeys.Remove(client);
+                }
+            }
             client.Close();
         }
     }

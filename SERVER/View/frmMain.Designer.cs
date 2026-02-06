@@ -117,6 +117,7 @@
             listViewClientConnected.TabIndex = 6;
             listViewClientConnected.UseCompatibleStateImageBehavior = false;
             listViewClientConnected.View = View.Details;
+            listViewClientConnected.SelectedIndexChanged += listViewClientConnected_SelectedIndexChanged;
             // 
             // btnClientOut
             // 

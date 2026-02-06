@@ -34,6 +34,9 @@ namespace SERVER
             }
         }
 
-        
+        private void listViewClientConnected_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
     }
 }

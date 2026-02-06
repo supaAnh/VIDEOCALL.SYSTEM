@@ -6,9 +6,13 @@ using System.Windows.Forms;
 
 public class ClientSocketConnect
 {
+    // Đối tượng Socket kết nối tới server
     private Socket client;
+    // Bộ đệm nhận dữ liệu
     private byte[] buffer = new byte[1024 * 5000]; // 5MB
 
+    // Thuộc tính lưu khóa AES nhận được từ server
+    public byte[] AesKey { get; private set; }
 
     // Sự kiện để báo về Form khi có tin nhắn mới
     public event Action<byte[]> OnRawDataReceived;
@@ -50,20 +54,20 @@ public class ClientSocketConnect
                 byte[] data = new byte[received];
                 Array.Copy(buffer, 0, data, 0, received);
 
-                // Gửi mảng byte về Form xử lý
-                OnRawDataReceived?.Invoke(data);
+                // XỬ LÝ NHẬN KHÓA TẠI ĐÂY
+                // Giải gói tin ngay lập tức để kiểm tra xem có phải gói tin trao đổi khóa không
+                var package = COMMON.DTO.DataPackage.Unpack(data);
+                if (package.Type == COMMON.DTO.PackageType.DH_KeyExchange)
+                {
+                    this.AesKey = package.Content; // Lưu khóa vào thuộc tính của lớp
+                }
 
+                OnRawDataReceived?.Invoke(data);
                 client.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallback), null);
             }
-            else
-            {
-                HandleDisconnect();
-            }
+            else { HandleDisconnect(); }
         }
-        catch
-        {
-            HandleDisconnect();
-        }
+        catch { HandleDisconnect(); }
     }
 
     // Xử lý mất kết nối

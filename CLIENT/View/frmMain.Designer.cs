@@ -49,6 +49,7 @@
             xoáThànhViênToolStripMenuItem = new ToolStripMenuItem();
             xoáCuộcTròChuyệnToolStripMenuItem = new ToolStripMenuItem();
             openFileDialog1 = new OpenFileDialog();
+            columnHeader1 = new ColumnHeader();
             panelChooseChat.SuspendLayout();
             panelChatBox.SuspendLayout();
             contextMenuStrip1.SuspendLayout();
@@ -56,11 +57,13 @@
             // 
             // lvOnlineUser
             // 
+            lvOnlineUser.Columns.AddRange(new ColumnHeader[] { columnHeader1 });
             lvOnlineUser.Location = new Point(13, 35);
             lvOnlineUser.Name = "lvOnlineUser";
             lvOnlineUser.Size = new Size(236, 348);
             lvOnlineUser.TabIndex = 0;
             lvOnlineUser.UseCompatibleStateImageBehavior = false;
+            lvOnlineUser.View = System.Windows.Forms.View.Details;
             // 
             // label1
             // 
@@ -241,6 +244,11 @@
             // 
             openFileDialog1.FileName = "openFileDialog1";
             // 
+            // columnHeader1
+            // 
+            columnHeader1.Text = "Đang trực tuyến";
+            columnHeader1.Width = 250;
+            // 
             // frmMain
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
@@ -282,5 +290,6 @@
         private ToolStripMenuItem xoáCuộcTròChuyệnToolStripMenuItem;
         private OpenFileDialog openFileDialog1;
         private Button btnSignOut;
+        private ColumnHeader columnHeader1;
     }
 }

@@ -31,6 +31,25 @@ namespace CLIENT.View
             //Giải mã dữ liệu nhận được từ server
             DataPackage package = DataPackage.Unpack(data);
 
+            // Danh sách người dùng đang online
+            if (package.Type == PackageType.UserStatusUpdate)
+            {
+                string listUser = Encoding.UTF8.GetString(package.Content);
+                string[] users = listUser.Split(',');
+
+                this.Invoke(new Action(() => {
+                    lvOnlineUser.Items.Clear(); // Xóa sạch để cập nhật mới nhất
+                    foreach (string user in users)
+                    {
+                        if (!string.IsNullOrEmpty(user))
+                        {
+                            ListViewItem item = new ListViewItem(user);
+                            lvOnlineUser.Items.Add(item);
+                        }
+                    }
+                }));
+            }
+
             if (package.Type == PackageType.SecureMessage)
             {
                 // Sử dụng trực tiếp _client.AesKey
@@ -50,6 +69,8 @@ namespace CLIENT.View
                 }));
             }
         }
+
+       
 
         private void btnCallVideo_Click(object sender, EventArgs e)
         {

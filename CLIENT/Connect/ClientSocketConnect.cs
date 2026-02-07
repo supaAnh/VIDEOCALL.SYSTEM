@@ -55,11 +55,13 @@ public class ClientSocketConnect
                 Array.Copy(buffer, 0, data, 0, received);
 
                 // XỬ LÝ NHẬN KHÓA TẠI ĐÂY
+
+
                 // Giải gói tin ngay lập tức để kiểm tra xem có phải gói tin trao đổi khóa không
                 var package = COMMON.DTO.DataPackage.Unpack(data);
                 if (package.Type == COMMON.DTO.PackageType.DH_KeyExchange)
                 {
-                    this.AesKey = package.Content; // Lưu khóa vào thuộc tính của lớp
+                    this.AesKey = package.Content; // Đảm bảo gán lại key mới nhất từ Server
                 }
 
                 OnRawDataReceived?.Invoke(data);

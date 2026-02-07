@@ -52,28 +52,32 @@ public class SocketConnect
         {
             while (true)
             {
-                // Chấp nhận kết nối mới
                 Socket client = server.Accept();
+
+                // 1. Gửi Key AES trước
                 SendEncryptionKey(client);
 
-                // --- GỬI KEY NGAY KHI CHẤP NHẬN KẾT NỐI ---
-                SendEncryptionKey(client);
-
-                // Tạo luồng nhận dữ liệu cho client này
+                // 2. Bắt đầu luồng nhận dữ liệu
                 Thread receive = new Thread(ReceiveData);
                 receive.IsBackground = true;
                 receive.Start(client);
 
-                // Cập nhật giao diện
+                // 3. Cập nhật UI trên Server
                 string clientIP = client.RemoteEndPoint.ToString();
                 LogViewUI.AddClient(clientIP);
-                LogViewUI.AddLog($" [{clientIP}]: đã kết nối và nhận khóa bảo mật");
+                LogViewUI.AddLog($" [{clientIP}]: đã kết nối");
+
+                // QUAN TRỌNG: Đợi 1 chút để Client khởi tạo Form Main xong
+                // và gọi Broadcast cho TẤT CẢ mọi người trong danh sách
+                Thread.Sleep(300);
+                BroadcastOnlineList();
             }
         }
         catch (Exception ex)
         {
             // Xử lý khi server dừng hoặc lỗi
             LogViewUI.AddLog("Lỗi trong quá trình Accept: " + ex.Message);
+            BroadcastOnlineList();
         }
     }
 
@@ -170,6 +174,42 @@ public class SocketConnect
         }
     }
 
-    // Tạo key cho AES từng CLIENT
-    
+    //
+    // Phát danh sách online cho tất cả client
+    //
+    private void BroadcastOnlineList()
+    {
+        List<string> onlineUsers = new List<string>();
+
+        // Khóa lock để tránh lỗi khi nhiều luồng truy cập dictionary cùng lúc
+        lock (clientKeys)
+        {
+            foreach (var s in clientKeys.Keys)
+            {
+                if (s != null && s.Connected)
+                {
+                    onlineUsers.Add(s.RemoteEndPoint.ToString());
+                }
+            }
+        }
+
+        string listString = string.Join(",", onlineUsers);
+        byte[] content = Encoding.UTF8.GetBytes(listString);
+
+        // Sử dụng PackageType.UserStatusUpdate (Loại 5)
+        DataPackage listPackage = new DataPackage(PackageType.UserStatusUpdate, content);
+        byte[] finalData = listPackage.Pack();
+
+        lock (clientKeys)
+        {
+            foreach (var client in clientKeys.Keys)
+            {
+                if (client != null && client.Connected)
+                {
+                    try { client.Send(finalData); } catch { }
+                }
+            }
+        }
+    }
+
 }

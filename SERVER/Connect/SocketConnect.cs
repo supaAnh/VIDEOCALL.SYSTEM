@@ -16,16 +16,32 @@ public class SocketConnect
     // Trong SocketConnect.cs
     private Dictionary<Socket, byte[]> clientKeys = new Dictionary<Socket, byte[]>();
 
-
+    // Kết nối Database
+    private SERVER.Database.DatabaseConnect db = new SERVER.Database.DatabaseConnect();
     //
     // Khởi động Server
     //
     public void StartServer(int port)
     {
+        // KIỂM TRA KẾT NỐI DATABASE NGAY KHI KHỞI TẠO
+        if (db.TestConnection())
+        {
+            LogViewUI.AddLog("Database đã kết nối thành công (Port 1555).");
+        }
+        else
+        {
+            LogViewUI.AddLog("Không thể kết nối Database!");
+        }
+
+
+        // Khởi tạo dictionary lưu trữ khóa AES cho từng Client
         clientKeys = new Dictionary<Socket, byte[]>();
+        // Thiết lập địa chỉ IP và cổng
         IP = new IPEndPoint(IPAddress.Any, port);
         server = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
+        
+        
+        
         try
         {
             server.Bind(IP);
@@ -120,8 +136,14 @@ public class SocketConnect
                 byte[] actualData = new byte[received];
                 Array.Copy(buffer, 0, actualData, 0, received);
                 DataPackage package = DataPackage.Unpack(actualData);
+                // Lấy thông tin IP của người gửi
+                string senderIP = client.RemoteEndPoint.ToString();
 
-                if (package.Type == PackageType.ChatMessage || package.Type == PackageType.SecureMessage)
+                if (package.Type == PackageType.UserStatusUpdate)
+                {
+                    BroadcastOnlineList();
+                }
+                else if (package.Type == PackageType.ChatMessage || package.Type == PackageType.SecureMessage)
                 {
                     string displayMsg = "";
                     if (package.Type == PackageType.SecureMessage)
@@ -131,8 +153,18 @@ public class SocketConnect
                         {
                             try
                             {
-                                // Giải mã tin nhắn sang chuỗi văn bản thuần túy
-                                displayMsg = COMMON.Security.AES_Service.DecryptString(package.Content, key);
+                                string decrypted = AES_Service.DecryptString(package.Content, key);
+                                if (decrypted.Contains("|"))
+                                {
+                                    string targetIP = decrypted.Split('|')[0];
+                                    string messageContent = decrypted.Split('|')[1];
+
+                                    LogViewUI.AddLog($"Chat riêng: [{client.RemoteEndPoint}] -> [{targetIP}]: {messageContent}");
+
+                                    // Chuyển tiếp nguyên gói tin (đã đóng gói) cho người nhận
+                                    SERVER.Process.MessageDispatcher.ForwardToTarget(targetIP, actualData, clientKeys);
+                                    db.SaveChatMessage(senderIP, targetIP, messageContent);
+                                }
                             }
                             catch
                             {

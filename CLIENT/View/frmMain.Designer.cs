@@ -30,6 +30,7 @@
         {
             components = new System.ComponentModel.Container();
             lvOnlineUser = new ListView();
+            columnHeader1 = new ColumnHeader();
             label1 = new Label();
             panelChooseChat = new Panel();
             btnSignOut = new Button();
@@ -49,7 +50,6 @@
             xoáThànhViênToolStripMenuItem = new ToolStripMenuItem();
             xoáCuộcTròChuyệnToolStripMenuItem = new ToolStripMenuItem();
             openFileDialog1 = new OpenFileDialog();
-            columnHeader1 = new ColumnHeader();
             panelChooseChat.SuspendLayout();
             panelChatBox.SuspendLayout();
             contextMenuStrip1.SuspendLayout();
@@ -64,6 +64,11 @@
             lvOnlineUser.TabIndex = 0;
             lvOnlineUser.UseCompatibleStateImageBehavior = false;
             lvOnlineUser.View = System.Windows.Forms.View.Details;
+            // 
+            // columnHeader1
+            // 
+            columnHeader1.Text = "Đang trực tuyến";
+            columnHeader1.Width = 250;
             // 
             // label1
             // 
@@ -113,6 +118,7 @@
             btnChooseTarget.TabIndex = 3;
             btnChooseTarget.Text = "Trò chuyện";
             btnChooseTarget.UseVisualStyleBackColor = true;
+            btnChooseTarget.Click += btnChooseTarget_Click;
             // 
             // panelChatBox
             // 
@@ -244,11 +250,6 @@
             // 
             openFileDialog1.FileName = "openFileDialog1";
             // 
-            // columnHeader1
-            // 
-            columnHeader1.Text = "Đang trực tuyến";
-            columnHeader1.Width = 250;
-            // 
             // frmMain
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
@@ -259,6 +260,7 @@
             Name = "frmMain";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "CLIENT - Main";
+            Load += FrmMain_Load;
             panelChooseChat.ResumeLayout(false);
             panelChooseChat.PerformLayout();
             panelChatBox.ResumeLayout(false);

@@ -123,87 +123,151 @@ public class SocketConnect
     //
     public void ReceiveData(object obj)
     {
-        Socket client = obj as Socket;
+        Socket senderSocket = obj as Socket;
+        if (senderSocket == null) return;
+
         try
         {
             while (true)
             {
                 byte[] buffer = new byte[1024 * 5000];
-                int received = client.Receive(buffer);
+                int received = senderSocket.Receive(buffer);
                 if (received == 0) break;
 
-                // Giải gói tin để biết loại dữ liệu
                 byte[] actualData = new byte[received];
                 Array.Copy(buffer, 0, actualData, 0, received);
+
+                // Giải gói tin thô để lấy nội dung (đã mã hóa)
                 DataPackage package = DataPackage.Unpack(actualData);
-                // Lấy thông tin IP của người gửi
-                string senderIP = client.RemoteEndPoint.ToString();
+                string senderIP = senderSocket.RemoteEndPoint.ToString();
 
                 if (package.Type == PackageType.UserStatusUpdate)
                 {
                     BroadcastOnlineList();
                 }
-                else if (package.Type == PackageType.ChatMessage || package.Type == PackageType.SecureMessage)
+                else if (package.Type == PackageType.SecureMessage)
                 {
-                    string displayMsg = "";
-                    if (package.Type == PackageType.SecureMessage)
+                    // Lấy Key của người gửi để giải mã tin nhắn
+                    if (clientKeys.TryGetValue(senderSocket, out byte[] senderKey))
                     {
-                        // Tìm khóa AES tương ứng với Socket đang gửi tin nhắn
-                        if (clientKeys.TryGetValue(client, out byte[] key))
+                        try
                         {
-                            try
+                            // Giải mã để đọc thông tin targetIP và nội dung tin nhắn
+                            string decrypted = AES_Service.DecryptString(package.Content, senderKey);
+
+                            if (decrypted.Contains("|"))
                             {
-                                string decrypted = AES_Service.DecryptString(package.Content, key);
-                                if (decrypted.Contains("|"))
+                                string[] parts = decrypted.Split('|');
+                                string targetIP = parts[0];
+                                string messageContent = parts[1];
+
+                                LogViewUI.AddLog($"Chat: [{senderIP}] -> [{targetIP}]: {messageContent}");
+                                db.SaveChatMessage(senderIP, targetIP, messageContent);
+
+                                // Tìm Socket và Key của người nhận để mã hóa lại
+                                bool sent = false;
+                                lock (clientKeys)
                                 {
-                                    string targetIP = decrypted.Split('|')[0];
-                                    string messageContent = decrypted.Split('|')[1];
+                                    foreach (var item in clientKeys)
+                                    {
+                                        Socket targetSocket = item.Key;
+                                        byte[] targetKey = item.Value;
 
-                                    LogViewUI.AddLog($"Chat riêng: [{client.RemoteEndPoint}] -> [{targetIP}]: {messageContent}");
+                                        if (targetSocket.RemoteEndPoint.ToString() == targetIP && targetSocket.Connected)
+                                        {
 
-                                    // Chuyển tiếp nguyên gói tin (đã đóng gói) cho người nhận
-                                    SERVER.Process.MessageDispatcher.ForwardToTarget(targetIP, actualData, clientKeys);
-                                    db.SaveChatMessage(senderIP, targetIP, messageContent);
+                                            string messageToForward = $"{senderIP}|{messageContent}";
+
+                                            // Mã hóa lại bằng Key của người nhận
+                                            byte[] reEncryptedContent = AES_Service.EncryptString(messageToForward, targetKey);
+                                            DataPackage forwardPackage = new DataPackage(PackageType.SecureMessage, reEncryptedContent);
+
+                                            targetSocket.Send(forwardPackage.Pack());
+                                            sent = true;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (!sent)
+                                {
+                                    LogViewUI.AddLog($" !!!Không tìm thấy người nhận: {targetIP}");
                                 }
                             }
-                            catch
+                        }
+                        catch (Exception ex)
+                        {
+                            LogViewUI.AddLog($" !!!Lỗi xử lý tin nhắn bảo mật: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        LogViewUI.AddLog($" !!!Không tìm thấy khóa của sender: {senderIP}");
+                    }
+                }
+                else if (package.Type == PackageType.ChatMessage)
+                {
+                    string msg = Encoding.UTF8.GetString(package.Content);
+                    LogViewUI.AddLog($"Tin nhắn thường từ [{senderIP}]: {msg}");
+
+                    // Broadcast cho các client khác (không mã hóa)
+                    lock (clientKeys)
+                    {
+                        foreach (Socket client in clientKeys.Keys)
+                        {
+                            if (client != senderSocket && client.Connected)
                             {
-                                displayMsg = "[Lỗi giải mã]";
+                                client.Send(actualData);
                             }
                         }
-                        else
-                        {
-                            displayMsg = "[Không tìm thấy khóa bảo mật]";
-                        }
-                    }
-                    else if (package.Type == PackageType.ChatMessage)
-                    {
-                        displayMsg = Encoding.UTF8.GetString(package.Content); 
-                    }
-
-                    SERVER.LogUI.LogViewUI.AddLog($"Tin nhắn từ [{client.RemoteEndPoint}]: {displayMsg}");
-                    // Chuyển tiếp cho các Client khác
-                    foreach (Socket item in clientKeys.Keys)
-                    {
-                        if (item != null && item != client && item.Connected)
-                        {
-                            item.Send(actualData);
-                        }
                     }
                 }
-            }
-        }
-        catch
-        {
-            lock (clientKeys)
-            {
-                if (clientKeys.ContainsKey(client))
+                else if (package.Type == PackageType.RequestChatHistory)
                 {
-                    clientKeys.Remove(client);
+                    string targetIP = Encoding.UTF8.GetString(package.Content);
+                    string requesterIP = senderSocket.RemoteEndPoint.ToString();
+
+                    // Lấy từ DB
+                    List<string> logs = db.GetChatHistory(requesterIP, targetIP);
+
+                    foreach (string line in logs)
+                    {
+                        // Gửi trả lại cho người yêu cầu dưới dạng SecureMessage để Client tự hiển thị
+                        // Lưu ý: Bạn cần mã hóa lại tin nhắn này bằng Key của người yêu cầu
+                        if (clientKeys.TryGetValue(senderSocket, out byte[] key))
+                        {
+                            byte[] encrypted = AES_Service.EncryptString(line, key);
+                            DataPackage historyPkg = new DataPackage(PackageType.SecureMessage, encrypted);
+                            senderSocket.Send(historyPkg.Pack());
+                        }
+                    }
                 }
             }
-            client.Close();
         }
+        catch (Exception ex)
+        {
+            LogViewUI.AddLog($"Client [{senderSocket.RemoteEndPoint}] ngắt kết nối: {ex.Message}");
+        }
+        finally
+        {
+            HandleDisconnect(senderSocket);
+        }
+    }
+
+    // hàm xử lý ngắt kết nối 
+    private void HandleDisconnect(Socket client)
+    {
+        lock (clientKeys)
+        {
+            if (clientKeys.ContainsKey(client))
+            {
+                clientKeys.Remove(client);
+            }
+        }
+        string ip = client.RemoteEndPoint?.ToString() ?? "Unknown";
+        client.Close();
+        LogViewUI.RemoveClient(ip);
+        BroadcastOnlineList();
     }
 
     //

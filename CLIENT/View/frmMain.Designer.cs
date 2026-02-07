@@ -219,7 +219,6 @@
             txtChatBox.Name = "txtChatBox";
             txtChatBox.Size = new Size(617, 364);
             txtChatBox.TabIndex = 0;
-            txtChatBox.Visible = false;
             // 
             // contextMenuStrip1
             // 

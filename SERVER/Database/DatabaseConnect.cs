@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using Microsoft.Data.SqlClient; // Đảm bảo đã cài NuGet package này
 using System.Text;
+using SERVER.LogUI;
 
 namespace SERVER.Database
 {
@@ -39,22 +40,26 @@ namespace SERVER.Database
             {
                 using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
-                    string query = "INSERT INTO ChatHistory (SenderIP, ReceiverIP, Content, Timestamp) " +
+                    // Đổi 'Content' thành 'ContentVarbinary' để khớp với ảnh SQL của bạn
+                    string query = "INSERT INTO ChatHistory (SenderIP, ReceiverIP, ContentVarbinary, Timestamp) " +
                                    "VALUES (@sender, @receiver, @content, @time)";
 
                     SqlCommand cmd = new SqlCommand(query, conn);
                     cmd.Parameters.AddWithValue("@sender", senderIP);
                     cmd.Parameters.AddWithValue("@receiver", receiverIP);
-                    cmd.Parameters.AddWithValue("@content", encryptedContent);
+
+                    // Nếu cột là Varbinary, nên chuyển string thành mảng byte
+                    cmd.Parameters.AddWithValue("@content", Encoding.UTF8.GetBytes(encryptedContent));
                     cmd.Parameters.AddWithValue("@time", DateTime.Now);
 
                     conn.Open();
                     cmd.ExecuteNonQuery();
+                    LogViewUI.AddLog(" >>> Lưu tin nhắn thành công");
                 }
             }
             catch (Exception ex)
             {
-                // Gọi Log từ LogUI đã có của bạn để theo dõi lỗi
+                // Kiểm tra lỗi tại đây trên giao diện Server
                 SERVER.LogUI.LogViewUI.AddLog("Lỗi SQL (Save): " + ex.Message);
             }
         }
@@ -70,7 +75,7 @@ namespace SERVER.Database
                 using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
                     // Lấy tin nhắn qua lại giữa A và B, sắp xếp theo thời gian
-                    string query = "SELECT SenderIP, Content FROM ChatHistory " +
+                    string query = "SELECT SenderIP, ContentVarbinary, Timestamp FROM ChatHistory " +
                                    "WHERE (SenderIP = @userA AND ReceiverIP = @userB) " +
                                    "OR (SenderIP = @userB AND ReceiverIP = @userA) " +
                                    "ORDER BY Timestamp ASC";
@@ -85,7 +90,8 @@ namespace SERVER.Database
                         while (reader.Read())
                         {
                             string sender = reader["SenderIP"].ToString();
-                            string content = reader["Content"].ToString();
+                            byte[] contentRaw = (byte[])reader["ContentVarbinary"];
+                            string content = Encoding.UTF8.GetString(contentRaw);
                             history.Add($"{sender}|{content}");
                         }
                     }

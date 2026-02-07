@@ -72,29 +72,32 @@ namespace CLIENT.View
 
             if (package.Type == PackageType.SecureMessage)
             {
-                if (_client.AesKey != null)
+                try
                 {
-                    try
-                    {
-                        string decrypted = AES_Service.DecryptString(package.Content, _client.AesKey);
+                    string decrypted = AES_Service.DecryptString(package.Content, _client.AesKey);
 
-                        if (decrypted.Contains("|"))
-                        {
-                            string[] parts = decrypted.Split('|');
-                            string targetIP = parts[0]; // Đây là IP người nhận (có thể là chính mình)
-                            string message = parts[1]; // Nội dung tin nhắn
-
-                            this.Invoke(new Action(() => {
-                                // HIỂN THỊ TIN NHẮN:
-                                txtChatBox.AppendText($"[{lbTargetName}]: {message}" + Environment.NewLine);
-                            }));
-                        }
-                    }
-                    catch (Exception ex)
+                    if (decrypted.Contains("|"))
                     {
-                        // Thêm log để debug xem lỗi giải mã hay lỗi tách chuỗi
-                        MessageBox.Show("Lỗi nhận tin nhắn: " + ex.Message);
+                        string[] parts = decrypted.Split('|');
+                        string incomingSenderIP = parts[0];
+                        string content = parts[1];
+
+                        this.Invoke(new Action(() => {
+                            // Chỉ hiển thị nếu người gửi chính là người mình đang chọn chat
+                            if (incomingSenderIP == _selectedTargetIP)
+                            {
+                                txtChatBox.AppendText($"[{incomingSenderIP}]: {content}{Environment.NewLine}");
+                            }
+                            else
+                            {
+                                MessageBox.Show($"Tin nhắn mới từ [{incomingSenderIP}]: {content}", "Tin nhắn mới");
+                            }
+                        }));
                     }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Lỗi hiển thị chat: " + ex.Message);
                 }
             }
             else if (package.Type == PackageType.DH_KeyExchange)
@@ -125,7 +128,6 @@ namespace CLIENT.View
 
         private void btnSendChat_Click(object sender, EventArgs e)
         {
-            // Kiểm tra xem đã nhận được key từ server chưa
             if (_client.AesKey == null)
             {
                 MessageBox.Show("Chưa thiết lập kết nối bảo mật!", "Thiếu Key");
@@ -133,16 +135,26 @@ namespace CLIENT.View
             }
 
             string message = txtChat.Text;
-            if (!string.IsNullOrEmpty(message))
+            // Kiểm tra xem đã chọn người để chat cùng chưa (_selectedTargetIP được gán khi nhấn nút "Trò chuyện")
+            if (!string.IsNullOrEmpty(message) && !string.IsNullOrEmpty(_selectedTargetIP))
             {
-                byte[] encryptedContent = COMMON.Security.AES_Service.EncryptString(message, _client.AesKey);
+                // ĐỊNH DẠNG: TargetIP|Nội dung tin nhắn
+                string rawData = $"{_selectedTargetIP}|{message}";
 
-                // Đóng gói và gửi
-                var package = new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.SecureMessage, encryptedContent);
+                // Mã hóa toàn bộ chuỗi định dạng trên
+                byte[] encryptedContent = AES_Service.EncryptString(rawData, _client.AesKey);
+
+                // Đóng gói và gửi gói tin SecureMessage (Type 7)
+                var package = new DataPackage(PackageType.SecureMessage, encryptedContent);
                 _client.Send(package.Pack());
 
+                // Hiển thị lên chính mình
                 txtChatBox.AppendText("Tôi: " + message + Environment.NewLine);
                 txtChat.Clear();
+            }
+            else if (string.IsNullOrEmpty(_selectedTargetIP))
+            {
+                MessageBox.Show("Vui lòng chọn một người trong danh sách để bắt đầu trò chuyện!");
             }
         }
 
@@ -151,9 +163,14 @@ namespace CLIENT.View
             if (lvOnlineUser.SelectedItems.Count > 0)
             {
                 _selectedTargetIP = lvOnlineUser.SelectedItems[0].Text;
-                lbTargetName.Text = "" + _selectedTargetIP;
+                lbTargetName.Text = _selectedTargetIP;
+                txtChatBox.Clear(); // Xóa trắng box chat cũ
                 txtChatBox.Visible = true;
-                MessageBox.Show($"Bắt đầu chat với [{_selectedTargetIP}]" + "Chatbox");
+
+                // GỬI YÊU CẦU LẤY LỊCH SỬ CHO SERVER
+                byte[] requestData = Encoding.UTF8.GetBytes(_selectedTargetIP);
+                DataPackage p = new DataPackage(PackageType.RequestChatHistory, requestData);
+                _client.Send(p.Pack());
             }
         }
     }

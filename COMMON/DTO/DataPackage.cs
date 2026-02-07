@@ -14,6 +14,7 @@ namespace COMMON.DTO
         UserStatusUpdate = 5, // Cập nhật trạng thái người dùng (online/offline)
         DH_KeyExchange = 6,   // Gói tin trao đổi khóa công khai DH
         SecureMessage = 7, // Gửi tin nhắn đã mã hóa
+        RequestChatHistory = 8, // Yêu cầu lịch sử chat
     }
 
     public class DataPackage

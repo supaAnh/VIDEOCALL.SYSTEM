@@ -240,30 +240,6 @@ public class SocketConnect
                 }
 
                 //
-                // Xử lý yêu cầu lịch sử chat
-                //
-                else if (package.Type == PackageType.RequestChatHistory)
-                {
-                    string targetIP = Encoding.UTF8.GetString(package.Content);
-                    string requesterIP = senderSocket.RemoteEndPoint.ToString();
-
-                    // Lấy từ DB
-                    List<string> logs = db.GetChatHistory(requesterIP, targetIP);
-
-                    foreach (string line in logs)
-                    {
-                        // Gửi trả lại cho người yêu cầu dưới dạng SecureMessage để Client tự hiển thị
-                        // mã hóa lại tin nhắn này bằng Key của người yêu cầu
-                        if (clientKeys.TryGetValue(senderSocket, out byte[] key))
-                        {
-                            byte[] encrypted = AES_Service.EncryptString(line, key);
-                            DataPackage historyPkg = new DataPackage(PackageType.SecureMessage, encrypted);
-                            senderSocket.Send(historyPkg.Pack());
-                        }
-                    }
-                }
-
-                //
                 // Xử lý tạo nhóm
                 //
                 else if (package.Type == PackageType.CreateGroup)
@@ -271,9 +247,21 @@ public class SocketConnect
                     string data = Encoding.UTF8.GetString(package.Content);
                     string[] parts = data.Split('|');
                     string groupName = parts[0];
-                    string[] members = parts[1].Split(',');
+                    List<string> members = parts[1].Split(',').ToList();
 
-                    // Tạo gói tin thông báo nhóm mới (Type 10)
+                    // Luôn thêm "người nhấn tạo" vào danh sách thành viên nhóm
+                    if (!members.Contains(senderIP))
+                    {
+                        members.Add(senderIP);
+                    }
+
+                    lock (groupMembersTable)
+                    {
+                        // Lưu hoặc cập nhật danh sách thành viên vào bộ nhớ Server
+                        groupMembersTable[groupName] = members;
+                    }
+
+                    // Gửi thông báo có nhóm mới cho tất cả thành viên
                     DataPackage groupUpdate = new DataPackage(PackageType.GroupUpdate, Encoding.UTF8.GetBytes(groupName));
                     byte[] finalData = groupUpdate.Pack();
 
@@ -281,11 +269,9 @@ public class SocketConnect
                     {
                         foreach (var client in clientKeys.Keys)
                         {
-                            string clientIP = client.RemoteEndPoint.ToString();
-                            // Nếu client nằm trong danh sách thành viên của nhóm mới
-                            if (members.Contains(clientIP))
+                            if (members.Contains(client.RemoteEndPoint.ToString()))
                             {
-                                client.Send(finalData); // Gửi "User ảo" về cho client
+                                client.Send(finalData);
                             }
                         }
                     }
@@ -300,40 +286,55 @@ public class SocketConnect
                     {
                         try
                         {
-                            // Giải mã nội dung: "TenNhom|NoiDungTinNhan"
+                            // 1. Giải mã tin nhắn từ người gửi: "TenNhom|NoiDung"
                             string decrypted = AES_Service.DecryptString(package.Content, senderKey);
                             string[] parts = decrypted.Split('|');
+                            if (parts.Length < 2) return;
+
                             string groupName = parts[0];
                             string messageContent = parts[1];
 
-                            // KHÔNG khai báo lại string senderIP ở đây nữa vì đã có ở dòng 154
+                            // 2. Ghi Log và Lưu vào Database để đồng bộ lịch sử
                             LogViewUI.AddLog($"Group [{groupName}]: {senderIP} nói {messageContent}");
+                            db.SaveGroupMessage(senderIP, groupName, messageContent);
 
+                            // 3. Kiểm tra xem nhóm có tồn tại trong bộ nhớ Server không
                             if (groupMembersTable.ContainsKey(groupName))
                             {
-                                foreach (var memberIP in groupMembersTable[groupName])
-                                {
-                                    lock (clientKeys)
-                                    {
-                                        foreach (var item in clientKeys)
-                                        {
-                                            if (item.Key.RemoteEndPoint.ToString() == memberIP && item.Key.Connected)
-                                            {
-                                                // Gửi xuống: "TenNhom|IP_NguoiGui|NoiDung"
-                                                string forwardData = $"{groupName}|{senderIP}|{messageContent}";
-                                                byte[] reEncrypted = AES_Service.EncryptString(forwardData, item.Value);
+                                List<string> members = groupMembersTable[groupName];
 
-                                                DataPackage forwardPkg = new DataPackage(PackageType.GroupMessage, reEncrypted);
-                                                item.Key.Send(forwardPkg.Pack());
-                                            }
+                                lock (clientKeys)
+                                {
+                                    foreach (var item in clientKeys)
+                                    {
+                                        Socket targetSocket = item.Key;
+                                        byte[] targetKey = item.Value;
+                                        string targetIP = targetSocket.RemoteEndPoint.ToString();
+
+                                        // ĐIỀU KIỆN GỬI:
+                                        // - IP mục tiêu nằm trong danh sách thành viên nhóm
+                                        // - Socket đang kết nối
+                                        // - KHÔNG gửi lại cho chính người gửi (vì Client đã tự hiển thị rồi)
+                                        if (members.Contains(targetIP) && targetSocket.Connected && targetSocket != senderSocket)
+                                        {
+                                            // Định dạng gói tin gửi đi: "TenNhom|IP_NguoiGui|NoiDung"
+                                            string forwardData = $"{groupName}|{senderIP}|{messageContent}";
+                                            byte[] reEncrypted = AES_Service.EncryptString(forwardData, targetKey);
+
+                                            DataPackage forwardPkg = new DataPackage(PackageType.GroupMessage, reEncrypted);
+                                            targetSocket.Send(forwardPkg.Pack());
                                         }
                                     }
                                 }
                             }
+                            else
+                            {
+                                LogViewUI.AddLog($" !!! Lỗi: Không tìm thấy danh sách thành viên cho nhóm {groupName}");
+                            }
                         }
                         catch (Exception ex)
                         {
-                            LogViewUI.AddLog($"Lỗi xử lý GroupMessage: {ex.Message}");
+                            LogViewUI.AddLog($" !!! Lỗi xử lý GroupMessage: {ex.Message}");
                         }
                     }
                 }
@@ -409,34 +410,36 @@ public class SocketConnect
     //
     private void BroadcastOnlineList()
     {
-        List<string> onlineUsers = new List<string>();
-
-        // Khóa lock để tránh lỗi khi nhiều luồng truy cập dictionary cùng lúc
         lock (clientKeys)
         {
+            // 1. Lấy danh sách tất cả các IP đang kết nối
+            List<string> allOnlineUsers = new List<string>();
             foreach (var s in clientKeys.Keys)
             {
                 if (s != null && s.Connected)
                 {
-                    onlineUsers.Add(s.RemoteEndPoint.ToString());
+                    allOnlineUsers.Add(s.RemoteEndPoint.ToString());
                 }
             }
-        }
 
-        string listString = string.Join(",", onlineUsers);
-        byte[] content = Encoding.UTF8.GetBytes(listString);
-
-        // Sử dụng PackageType.UserStatusUpdate (Loại 5)
-        DataPackage listPackage = new DataPackage(PackageType.UserStatusUpdate, content);
-        byte[] finalData = listPackage.Pack();
-
-        lock (clientKeys)
-        {
+            // 2. Gửi danh sách đã lọc cho từng Client cụ thể
             foreach (var client in clientKeys.Keys)
             {
                 if (client != null && client.Connected)
                 {
-                    try { client.Send(finalData); } catch { }
+                    try
+                    {
+                        string myIP = client.RemoteEndPoint.ToString();
+                        // Lọc bỏ IP của chính Client này khỏi danh sách gửi cho họ
+                        var filteredList = allOnlineUsers.Where(ip => ip != myIP).ToList();
+
+                        string listString = string.Join(",", filteredList);
+                        byte[] content = Encoding.UTF8.GetBytes(listString);
+
+                        DataPackage listPackage = new DataPackage(PackageType.UserStatusUpdate, content);
+                        client.Send(listPackage.Pack());
+                    }
+                    catch { }
                 }
             }
         }

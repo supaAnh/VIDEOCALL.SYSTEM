@@ -236,20 +236,25 @@ namespace CLIENT.View
             List<string> users = new List<string>();
             foreach (ListViewItem item in lvOnlineUser.Items)
             {
-                users.Add(item.Text);
+                // Chỉ lấy các User, bỏ qua các Group đã có trong danh sách
+                if (item.Tag?.ToString() != "GROUP")
+                {
+                    users.Add(item.Text);
+                }
             }
 
             using (var frm = new frmCreateGroupChat(users))
             {
                 if (frm.ShowDialog() == DialogResult.OK)
                 {
-                    // Định dạng: TenNhom|IP1,IP2,IP3
+                    // Client chỉ gửi danh sách những người được chọn
+                    // Server sẽ tự động thêm người tạo vào
                     string members = string.Join(",", frm.SelectedUsers);
                     string rawData = $"{frm.GroupName}|{members}";
 
                     byte[] content = Encoding.UTF8.GetBytes(rawData);
                     DataPackage p = new DataPackage(PackageType.CreateGroup, content);
-                    _client.Send(p.Pack()); //
+                    _client.Send(p.Pack());
                 }
             }
         }

@@ -103,5 +103,71 @@ namespace SERVER.Database
             }
             return history;
         }
+
+
+
+        /// <summary>
+        /// CHAT GROUP - Lưu tin nhắn nhóm đã mã hóa vào SQL Server
+        /// </summary>
+        public void SaveGroupMessage(string senderIP, string groupName, string message)
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    // Trỏ vào bảng GroupChatHistory
+                    string query = "INSERT INTO GroupChatHistory (SenderIP, GroupName, ContentVarbinary, Timestamp) " +
+                                   "VALUES (@sender, @group, @content, @time)";
+
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@sender", senderIP);
+                    cmd.Parameters.AddWithValue("@group", groupName);
+                    cmd.Parameters.AddWithValue("@content", Encoding.UTF8.GetBytes(message));
+                    cmd.Parameters.AddWithValue("@time", DateTime.Now);
+
+                    conn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                LogViewUI.AddLog("Lỗi SQL Group (Save): " + ex.Message);
+            }
+        }
+
+        public List<string> GetGroupChatHistory(string groupName)
+        {
+            List<string> history = new List<string>();
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    // Truy vấn từ bảng GroupChatHistory
+                    string query = "SELECT SenderIP, ContentVarbinary FROM GroupChatHistory " +
+                                   "WHERE GroupName = @group ORDER BY Timestamp ASC";
+
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@group", groupName);
+
+                    conn.Open();
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string sender = reader["SenderIP"].ToString();
+                            byte[] contentRaw = (byte[])reader["ContentVarbinary"];
+                            string content = Encoding.UTF8.GetString(contentRaw);
+                            // Format: TenNhom|NguoiGui|NoiDung
+                            history.Add($"{groupName}|{sender}|{content}");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogViewUI.AddLog("Lỗi SQL Group (Get): " + ex.Message);
+            }
+            return history;
+        }
     }
 }

@@ -49,8 +49,10 @@ namespace CLIENT.View
         {
             //Giải mã dữ liệu nhận được từ server
             DataPackage package = DataPackage.Unpack(data);
-
+            
+            //
             // Danh sách người dùng đang online
+            //
             if (package.Type == PackageType.UserStatusUpdate)
             {
                 string listUser = Encoding.UTF8.GetString(package.Content);
@@ -70,7 +72,58 @@ namespace CLIENT.View
                 }));
             }
 
-            if (package.Type == PackageType.SecureMessage)
+            //
+            // Cập nhật nhóm mới
+            //
+            else if (package.Type == PackageType.GroupUpdate)
+            {
+                string groupName = Encoding.UTF8.GetString(package.Content);
+                this.Invoke(new Action(() =>
+                {
+                    ListViewItem groupItem = new ListViewItem(groupName);
+                    groupItem.ForeColor = Color.Blue; // Đổi màu xanh để nhận diện là Nhóm
+                    groupItem.Font = new Font(lvOnlineUser.Font, FontStyle.Bold);
+                    groupItem.Tag = "GROUP"; // Đánh dấu loại để xử lý logic gửi tin sau này
+                    lvOnlineUser.Items.Add(groupItem);
+                }));
+            }
+
+            //
+            // Tin nhắn nhóm
+            //
+            else if (package.Type == PackageType.GroupMessage)
+            {
+                try
+                {
+                    string decrypted = AES_Service.DecryptString(package.Content, _client.AesKey);
+                    string[] parts = decrypted.Split('|');
+                    string groupName = parts[0];
+                    string senderIP = parts[1];
+                    string content = parts[2];
+
+                    this.Invoke(new Action(() => {
+                        // Hiển thị nếu đang mở đúng cửa sổ chat của nhóm đó
+                        if (_selectedTargetIP == groupName)
+                        {
+                            txtChatBox.AppendText($"[{senderIP}]: {content}{Environment.NewLine}");
+                        }
+                        else
+                        {
+                            // Thông báo tin nhắn mới từ nhóm khác
+                            MessageBox.Show($"Tin nhắn mới từ nhóm {groupName}");
+                        }
+                    }));
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Lỗi giải mã tin nhắn nhóm: " + ex.Message);
+                }
+            }
+
+            //
+            // Tin nhắn bảo mật từ người khác
+            //
+            else if (package.Type == PackageType.SecureMessage)
             {
                 try
                 {
@@ -82,7 +135,8 @@ namespace CLIENT.View
                         string incomingSenderIP = parts[0];
                         string content = parts[1];
 
-                        this.Invoke(new Action(() => {
+                        this.Invoke(new Action(() =>
+                        {
                             // Chỉ hiển thị nếu người gửi chính là người mình đang chọn chat
                             if (incomingSenderIP == _selectedTargetIP)
                             {
@@ -100,6 +154,10 @@ namespace CLIENT.View
                     MessageBox.Show("Lỗi hiển thị chat: " + ex.Message);
                 }
             }
+
+            //
+            // Thiết lập kết nối bảo mật (nhận khóa DH từ server)
+            //
             else if (package.Type == PackageType.DH_KeyExchange)
             {
                 this.aesKey = package.Content; // Lưu khóa này lại để dùng cho AES_Service
@@ -128,34 +186,32 @@ namespace CLIENT.View
 
         private void btnSendChat_Click(object sender, EventArgs e)
         {
-            if (_client.AesKey == null)
-            {
-                MessageBox.Show("Chưa thiết lập kết nối bảo mật!", "Thiếu Key");
-                return;
-            }
+            if (string.IsNullOrEmpty(_selectedTargetIP) || string.IsNullOrEmpty(txtChat.Text)) return;
 
             string message = txtChat.Text;
-            // Kiểm tra xem đã chọn người để chat cùng chưa (_selectedTargetIP được gán khi nhấn nút "Trò chuyện")
-            if (!string.IsNullOrEmpty(message) && !string.IsNullOrEmpty(_selectedTargetIP))
+
+            // Kiểm tra xem mục tiêu đang chọn là Group hay User thông qua Tag
+            bool isGroup = lvOnlineUser.SelectedItems.Count > 0 && lvOnlineUser.SelectedItems[0].Tag?.ToString() == "GROUP";
+
+            if (isGroup)
             {
-                // ĐỊNH DẠNG: TargetIP|Nội dung tin nhắn
+                // Gửi tin nhắn nhóm
                 string rawData = $"{_selectedTargetIP}|{message}";
-
-                // Mã hóa toàn bộ chuỗi định dạng trên
-                byte[] encryptedContent = AES_Service.EncryptString(rawData, _client.AesKey);
-
-                // Đóng gói và gửi gói tin SecureMessage (Type 7)
-                var package = new DataPackage(PackageType.SecureMessage, encryptedContent);
+                byte[] encrypted = AES_Service.EncryptString(rawData, _client.AesKey);
+                var package = new DataPackage(PackageType.GroupMessage, encrypted);
                 _client.Send(package.Pack());
-
-                // Hiển thị lên chính mình
-                txtChatBox.AppendText("Tôi: " + message + Environment.NewLine);
-                txtChat.Clear();
             }
-            else if (string.IsNullOrEmpty(_selectedTargetIP))
+            else
             {
-                MessageBox.Show("Vui lòng chọn một người trong danh sách để bắt đầu trò chuyện!");
+                // Gửi tin nhắn riêng (Logic cũ của bạn)
+                string rawData = $"{_selectedTargetIP}|{message}";
+                byte[] encrypted = AES_Service.EncryptString(rawData, _client.AesKey);
+                var package = new DataPackage(PackageType.SecureMessage, encrypted);
+                _client.Send(package.Pack());
             }
+
+            txtChatBox.AppendText($"Tôi: {message}{Environment.NewLine}");
+            txtChat.Clear();
         }
 
         private void btnChooseTarget_Click(object sender, EventArgs e)
@@ -171,6 +227,30 @@ namespace CLIENT.View
                 byte[] requestData = Encoding.UTF8.GetBytes(_selectedTargetIP);
                 DataPackage p = new DataPackage(PackageType.RequestChatHistory, requestData);
                 _client.Send(p.Pack());
+            }
+        }
+
+        private void btnCreateGroupChat_Click(object sender, EventArgs e)
+        {
+            // Lấy danh sách IP từ lvOnlineUser hiện tại
+            List<string> users = new List<string>();
+            foreach (ListViewItem item in lvOnlineUser.Items)
+            {
+                users.Add(item.Text);
+            }
+
+            using (var frm = new frmCreateGroupChat(users))
+            {
+                if (frm.ShowDialog() == DialogResult.OK)
+                {
+                    // Định dạng: TenNhom|IP1,IP2,IP3
+                    string members = string.Join(",", frm.SelectedUsers);
+                    string rawData = $"{frm.GroupName}|{members}";
+
+                    byte[] content = Encoding.UTF8.GetBytes(rawData);
+                    DataPackage p = new DataPackage(PackageType.CreateGroup, content);
+                    _client.Send(p.Pack()); //
+                }
             }
         }
     }

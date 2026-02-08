@@ -15,6 +15,9 @@ namespace COMMON.DTO
         DH_KeyExchange = 6,   // Gói tin trao đổi khóa công khai DH
         SecureMessage = 7, // Gửi tin nhắn đã mã hóa
         RequestChatHistory = 8, // Yêu cầu lịch sử chat
+        CreateGroup = 9,      // Client yêu cầu tạo nhóm
+        GroupUpdate = 10,     // Server thông báo có nhóm mới cho các thành viên
+        GroupMessage = 11     // Tin nhắn gửi trong nhóm
     }
 
     public class DataPackage

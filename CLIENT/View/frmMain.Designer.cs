@@ -109,6 +109,7 @@
             btnCreateGroupChat.TabIndex = 4;
             btnCreateGroupChat.Text = "Tạo nhóm";
             btnCreateGroupChat.UseVisualStyleBackColor = true;
+            btnCreateGroupChat.Click += btnCreateGroupChat_Click;
             // 
             // btnChooseTarget
             // 

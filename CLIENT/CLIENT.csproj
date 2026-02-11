@@ -22,4 +22,10 @@
     <ProjectReference Include="..\COMMON\COMMON.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Sound\soundtest.mp3">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -9,6 +9,9 @@ namespace CLIENT
         [STAThread]
         static void Main()
         {
+            ApplicationConfiguration.Initialize();
+
+            // Đường dẫn đến thư mục chứa ffmpeg binaries
             string ffmpegBinaryPath = @"D:\ffmpeg\bin";
 
             // Cập nhật biến môi trường PATH cho ứng dụng
@@ -18,8 +21,6 @@ namespace CLIENT
                 Environment.SetEnvironmentVariable("PATH", path + ";" + ffmpegBinaryPath);
             }
 
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new frmConnected());
 
         }

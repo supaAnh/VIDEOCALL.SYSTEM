@@ -148,6 +148,7 @@
             btnOutputTest.TabIndex = 12;
             btnOutputTest.Text = "Thử loa";
             btnOutputTest.UseVisualStyleBackColor = true;
+            btnOutputTest.Click += btnOutputTest_Click;
             // 
             // label4
             // 
@@ -191,6 +192,7 @@
             Name = "frmSelectOption";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "CLIENT - Preview";
+            Load += frmSelectOption_Load;
             ((System.ComponentModel.ISupportInitialize)pictureBoxCamPreview).EndInit();
             ResumeLayout(false);
             PerformLayout();

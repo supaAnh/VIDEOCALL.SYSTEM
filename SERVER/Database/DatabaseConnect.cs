@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using Microsoft.Data.SqlClient; // Đảm bảo đã cài NuGet package này
+using Microsoft.Data.SqlClient;
 using System.Text;
 using SERVER.LogUI;
 
@@ -169,5 +169,34 @@ namespace SERVER.Database
             }
             return history;
         }
+
+
+
+        /// <summary>
+        ///  FILE TRANSFER - Lưu thông tin file đã gửi vào SQL Server
+        /// </summary> 
+        /// 
+        
+        public void SaveFileHistory(string senderIP, string receiverIP, string fileName, byte[] fileData)
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    string query = "INSERT INTO ChatHistory (SenderIP, ReceiverIP, ContentVarbinary, Timestamp) VALUES (@sender, @receiver, @content, @time)";
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@sender", senderIP);
+                    cmd.Parameters.AddWithValue("@receiver", receiverIP);
+                    // Lưu tên file + data hoặc chỉ data tùy thiết kế
+                    cmd.Parameters.AddWithValue("@content", fileData);
+                    cmd.Parameters.AddWithValue("@time", DateTime.Now);
+                    conn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex) { LogViewUI.AddLog("Lỗi lưu file SQL: " + ex.Message); }
+        }
+
+
     }
 }

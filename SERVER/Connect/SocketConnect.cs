@@ -23,6 +23,10 @@ public class SocketConnect
 
     // Kết nối Database
     private SERVER.Database.DatabaseConnect db = new SERVER.Database.DatabaseConnect();
+
+    // Xử lý file
+    private SERVER.File.SendFile _fileHandler = new SERVER.File.SendFile();
+
     //
     // Khởi động Server
     //
@@ -275,6 +279,14 @@ public class SocketConnect
                             }
                         }
                     }
+                }
+
+                //
+                // Xử lý gửi file
+                //
+                else if (package.Type == PackageType.SendFile)
+                {
+                    _fileHandler.ForwardFile(senderSocket, package, clientKeys);
                 }
 
                 //

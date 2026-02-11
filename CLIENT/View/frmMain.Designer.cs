@@ -181,6 +181,7 @@
             btnSendFile.TabIndex = 4;
             btnSendFile.Text = "File";
             btnSendFile.UseVisualStyleBackColor = false;
+            btnSendFile.Click += btnSendFile_Click;
             // 
             // btnSendChat
             // 

@@ -13,7 +13,11 @@ namespace CLIENT.View
 {
     public partial class frmMain : Form
     {
+        // Kết nối socket với server
         private ClientSocketConnect _client;
+
+        // File logic xử lý gửi/nhận file
+        private Logic.FileProcess _fileProcess;
 
         private byte[] aesKey;
 
@@ -25,14 +29,23 @@ namespace CLIENT.View
         {
             InitializeComponent();
 
+            // Lưu tham chiếu ClientSocketConnect
             _client = client;
+
+            // Đăng ký sự kiện nhận dữ liệu từ server
             _client.OnRawDataReceived += (data) =>
             {
                 HandleIncomingData(data);
             };
 
+            // Khởi tạo ChatLogic
             _chatLogic = new Process.ChatLogic(_client);
 
+            // Khởi tạo FileLogic
+            _fileProcess = new Logic.FileProcess(_client);
+
+
+            // Đăng ký sự kiện Load của Form
             this.Load += FrmMain_Load;
         }
 
@@ -49,7 +62,7 @@ namespace CLIENT.View
         {
             //Giải mã dữ liệu nhận được từ server
             DataPackage package = DataPackage.Unpack(data);
-            
+
             //
             // Danh sách người dùng đang online
             //
@@ -89,6 +102,18 @@ namespace CLIENT.View
             }
 
             //
+            // Gửi file
+            //
+            else if (package.Type == PackageType.SendFile)
+            {
+                string fileName = _fileProcess.ProcessIncomingFile(package.Content);
+                this.Invoke(new Action(() => {
+                    txtChatBox.AppendText($"[{_selectedTargetIP}] đã gửi file: {fileName} (Đã lưu vào Downloads){Environment.NewLine}");
+                }));
+
+                MessageBox.Show($"Nhận file {fileName} thành công!");
+            }
+            //
             // Tin nhắn nhóm
             //
             else if (package.Type == PackageType.GroupMessage)
@@ -101,7 +126,8 @@ namespace CLIENT.View
                     string senderIP = parts[1];
                     string content = parts[2];
 
-                    this.Invoke(new Action(() => {
+                    this.Invoke(new Action(() =>
+                    {
                         // Hiển thị nếu đang mở đúng cửa sổ chat của nhóm đó
                         if (_selectedTargetIP == groupName)
                         {
@@ -256,6 +282,15 @@ namespace CLIENT.View
                     DataPackage p = new DataPackage(PackageType.CreateGroup, content);
                     _client.Send(p.Pack());
                 }
+            }
+        }
+
+        private void btnSendFile_Click(object sender, EventArgs e)
+        {
+            if (openFileDialog1.ShowDialog() == DialogResult.OK)
+            {
+                _fileProcess.ExecuteSendFile(_selectedTargetIP, openFileDialog1.FileName);
+                txtChatBox.AppendText($"[Hệ thống]: Đã gửi file [{Path.GetFileName(openFileDialog1.FileName)}] thành công!{Environment.NewLine}");
             }
         }
     }

@@ -23,28 +23,28 @@ namespace CLIENT.Logic
 
             try
             {
-                // Tạo đối tượng DTO giống cách bài Remote làm
                 var fileDto = new FilePackageDTO
                 {
                     FileName = Path.GetFileName(filePath),
                     FileData = File.ReadAllBytes(filePath)
                 };
 
-                // Chuyển đối tượng thành mảng byte (Serialize)
                 byte[] rawData = JsonSerializer.SerializeToUtf8Bytes(fileDto);
 
                 if (_client.AesKey != null)
                 {
-                    // Mã hóa nội dung bằng AES
+                    // 1. Mã hóa nội dung file
                     byte[] encrypted = COMMON.Security.AES_Service.Encrypt(rawData, _client.AesKey);
 
-                    // Tạo Header IP đích không mã hóa để Server điều hướng
-                    string header = targetIP + ":";
-                    byte[] headerBytes = Encoding.UTF8.GetBytes(header);
-                    byte[] finalPayload = new byte[headerBytes.Length + encrypted.Length];
+                    // 2. Chuẩn bị Header: [Độ dài IP (4B)][Chuỗi IP][Dữ liệu mã hóa]
+                    byte[] ipBytes = Encoding.UTF8.GetBytes(targetIP);
+                    byte[] ipLengthBytes = BitConverter.GetBytes(ipBytes.Length);
 
-                    Buffer.BlockCopy(headerBytes, 0, finalPayload, 0, headerBytes.Length);
-                    Buffer.BlockCopy(encrypted, 0, finalPayload, headerBytes.Length, encrypted.Length);
+                    byte[] finalPayload = new byte[4 + ipBytes.Length + encrypted.Length];
+
+                    Buffer.BlockCopy(ipLengthBytes, 0, finalPayload, 0, 4);
+                    Buffer.BlockCopy(ipBytes, 0, finalPayload, 4, ipBytes.Length);
+                    Buffer.BlockCopy(encrypted, 0, finalPayload, 4 + ipBytes.Length, encrypted.Length);
 
                     _client.Send(new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.SendFile, finalPayload).Pack());
                 }
@@ -59,26 +59,36 @@ namespace CLIENT.Logic
             {
                 if (_client.AesKey == null) return null;
 
-                // 1. Giải mã dữ liệu
                 byte[] decrypted = COMMON.Security.AES_Service.Decrypt(encryptedData, _client.AesKey);
-
-                // 2. Chuyển byte[] ngược lại thành đối tượng DTO (Deserialize)
                 var fileDto = JsonSerializer.Deserialize<FilePackageDTO>(decrypted);
 
                 if (fileDto != null)
                 {
+                    // Cách lấy thư mục Downloads an toàn hơn
                     string downloadsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+
+                    // Đảm bảo thư mục tồn tại
+                    if (!Directory.Exists(downloadsPath)) Directory.CreateDirectory(downloadsPath);
+
                     string filePath = Path.Combine(downloadsPath, fileDto.FileName);
 
+                    // Ghi file
                     File.WriteAllBytes(filePath, fileDto.FileData);
 
-                    // 3. Tự động mở thư mục và chọn file (Tham khảo từ RemoteDesktop)
+                    // In đường dẫn ra Console để bạn kiểm tra chính xác file nằm đâu
+                    Console.WriteLine("File saved at: " + filePath);
+
+                    // Mở thư mục và chọn file
                     System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{filePath}\"");
 
                     return fileDto.FileName;
                 }
             }
-            catch (Exception ex) { Console.WriteLine("Lỗi nhận file: " + ex.Message); }
+            catch (Exception ex)
+            {
+                // Thay vì Console.WriteLine, hãy dùng MessageBox để thấy lỗi thực sự khi đang chạy
+                MessageBox.Show("Lỗi ghi file: " + ex.Message);
+            }
             return null;
         }
     }

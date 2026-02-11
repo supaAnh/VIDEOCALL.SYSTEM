@@ -16,33 +16,39 @@ namespace SERVER.File
             try
             {
                 byte[] fullContent = package.Content;
-                int colonIdx = Array.IndexOf(fullContent, (byte)':');
+                if (fullContent.Length < 4) return;
 
-                if (colonIdx != -1)
+                // 1. Đọc độ dài IP mục tiêu
+                int ipLength = BitConverter.ToInt32(fullContent, 0);
+
+                // 2. Trích xuất IP mục tiêu
+                string targetIP = Encoding.UTF8.GetString(fullContent, 4, ipLength);
+
+                // 3. Trích xuất phần dữ liệu file đã mã hóa
+                int headerSize = 4 + ipLength;
+                byte[] fileEncrypted = new byte[fullContent.Length - headerSize];
+                Buffer.BlockCopy(fullContent, headerSize, fileEncrypted, 0, fileEncrypted.Length);
+
+                lock (clientKeys)
                 {
-                    string targetIP = Encoding.UTF8.GetString(fullContent, 0, colonIdx);
-                    byte[] fileEncrypted = new byte[fullContent.Length - colonIdx - 1];
-                    Buffer.BlockCopy(fullContent, colonIdx + 1, fileEncrypted, 0, fileEncrypted.Length);
-
-                    lock (clientKeys)
+                    foreach (var item in clientKeys)
                     {
-                        // Tìm đúng Client nhận dựa trên IP
-                        foreach (var item in clientKeys)
+                        if (item.Key.RemoteEndPoint.ToString() == targetIP && item.Key.Connected)
                         {
-                            if (item.Key.RemoteEndPoint.ToString() == targetIP && item.Key.Connected)
-                            {
-                                // Giải mã bằng khóa người gửi và mã hóa lại bằng khóa người nhận
-                                byte[] decrypted = COMMON.Security.AES_Service.Decrypt(fileEncrypted, clientKeys[senderSocket]);
-                                byte[] reEncrypted = COMMON.Security.AES_Service.Encrypt(decrypted, item.Value);
+                            // GIẢI MÃ bằng khóa của người gửi
+                            byte[] decryptedRaw = COMMON.Security.AES_Service.Decrypt(fileEncrypted, clientKeys[senderSocket]);
 
-                                item.Key.Send(new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.SendFile, reEncrypted).Pack());
-                                break;
-                            }
+                            // MÃ HÓA LẠI bằng khóa của người nhận
+                            byte[] reEncrypted = COMMON.Security.AES_Service.Encrypt(decryptedRaw, item.Value);
+
+                            item.Key.Send(new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.SendFile, reEncrypted).Pack());
+                            LogViewUI.AddLog($"Chuyển tiếp file: {senderSocket.RemoteEndPoint} -> {targetIP}");
+                            break;
                         }
                     }
                 }
             }
-            catch (Exception ex) { SERVER.LogUI.LogViewUI.AddLog("Lỗi chuyển tiếp: " + ex.Message); }
+            catch (Exception ex) { LogViewUI.AddLog("Lỗi chuyển tiếp file: " + ex.Message); }
         }
     }
 }

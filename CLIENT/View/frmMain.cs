@@ -108,23 +108,18 @@ namespace CLIENT.View
             {
                 this.Invoke(new Action(() =>
                 {
-                    try
+                    // Gọi hàm xử lý và nhận tên file trả về
+                    string fileName = _fileProcess.ProcessIncomingFile(package.Content);
+
+                    if (!string.IsNullOrEmpty(fileName))
                     {
-                        string fileName = _fileProcess.ProcessIncomingFile(package.Content);
-                        if (!string.IsNullOrEmpty(fileName))
-                        {
-                            // Hiển thị thông báo lên khung chat
-                            txtChatBox.AppendText($"[Hệ thống]: Nhận file thành công: {fileName}{Environment.NewLine}");
-                            MessageBox.Show($"Bạn đã nhận được file: {fileName}");
-                        }
-                        else
-                        {
-                            txtChatBox.AppendText($"[Hệ thống]: Nhận file thất bại (Lỗi giải mã hoặc định dạng).{Environment.NewLine}");
-                        }
+                        // Hiển thị thông báo lên khung chat
+                        txtChatBox.AppendText($"[Hệ thống]: Đã nhận file thành công: {fileName}{Environment.NewLine}");
+                        MessageBox.Show($"Bạn đã nhận được file: {fileName}", "Thông báo");
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        txtChatBox.AppendText($"[Hệ thống]: Lỗi khi nhận file: {ex.Message}{Environment.NewLine}");
+                        txtChatBox.AppendText($"[Hệ thống]: Nhận file thất bại (Lỗi giải mã).{Environment.NewLine}");
                     }
                 }));
             }

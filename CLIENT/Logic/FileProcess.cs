@@ -1,9 +1,10 @@
-﻿using System;
+﻿using COMMON.DTO;
+using COMMON.Security;
+using System;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Windows.Forms;
-using COMMON.DTO;
-using COMMON.Security;
 
 namespace CLIENT.Logic
 {
@@ -18,69 +19,67 @@ namespace CLIENT.Logic
 
         public void ExecuteSendFile(string targetIP, string filePath)
         {
-            if (string.IsNullOrEmpty(targetIP)) return;
+            if (string.IsNullOrEmpty(targetIP) || !File.Exists(filePath)) return;
 
             try
             {
-                byte[] fileData = File.ReadAllBytes(filePath);
-                string fileName = Path.GetFileName(filePath);
+                // Tạo đối tượng DTO giống cách bài Remote làm
+                var fileDto = new FilePackageDTO
+                {
+                    FileName = Path.GetFileName(filePath),
+                    FileData = File.ReadAllBytes(filePath)
+                };
 
-                // Định dạng: TenFile|FileData
-                byte[] nameBytes = Encoding.UTF8.GetBytes(fileName + "|");
-                byte[] combined = new byte[nameBytes.Length + fileData.Length];
-                Buffer.BlockCopy(nameBytes, 0, combined, 0, nameBytes.Length);
-                Buffer.BlockCopy(fileData, 0, combined, nameBytes.Length, fileData.Length);
+                // Chuyển đối tượng thành mảng byte (Serialize)
+                byte[] rawData = JsonSerializer.SerializeToUtf8Bytes(fileDto);
 
                 if (_client.AesKey != null)
                 {
-                    byte[] encrypted = AES_Service.Encrypt(combined, _client.AesKey);
+                    // Mã hóa nội dung bằng AES
+                    byte[] encrypted = COMMON.Security.AES_Service.Encrypt(rawData, _client.AesKey);
 
-                    // Gói IP đích vào header để Server điều hướng
+                    // Tạo Header IP đích không mã hóa để Server điều hướng
                     string header = targetIP + ":";
                     byte[] headerBytes = Encoding.UTF8.GetBytes(header);
                     byte[] finalPayload = new byte[headerBytes.Length + encrypted.Length];
+
                     Buffer.BlockCopy(headerBytes, 0, finalPayload, 0, headerBytes.Length);
                     Buffer.BlockCopy(encrypted, 0, finalPayload, headerBytes.Length, encrypted.Length);
 
-                    _client.Send(new DataPackage(PackageType.SendFile, finalPayload).Pack());
+                    _client.Send(new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.SendFile, finalPayload).Pack());
                 }
             }
-            catch (Exception ex) { MessageBox.Show("Lỗi đọc file: " + ex.Message); }
+            catch (Exception ex) { MessageBox.Show("Lỗi gửi file: " + ex.Message); }
         }
+
 
         public string ProcessIncomingFile(byte[] encryptedData)
         {
             try
             {
-                if (_client.AesKey == null) throw new Exception("Chưa có khóa AES.");
+                if (_client.AesKey == null) return null;
 
-                // Giải mã
-                byte[] decrypted = AES_Service.Decrypt(encryptedData, _client.AesKey);
+                // 1. Giải mã dữ liệu
+                byte[] decrypted = COMMON.Security.AES_Service.Decrypt(encryptedData, _client.AesKey);
 
-                // Tìm dấu phân tách '|'
-                int separatorIndex = Array.IndexOf(decrypted, (byte)'|');
-                if (separatorIndex == -1) throw new Exception("Định dạng file không hợp lệ (thiếu dấu phân tách).");
+                // 2. Chuyển byte[] ngược lại thành đối tượng DTO (Deserialize)
+                var fileDto = JsonSerializer.Deserialize<FilePackageDTO>(decrypted);
 
-                string fileName = Encoding.UTF8.GetString(decrypted, 0, separatorIndex);
-                byte[] fileBytes = new byte[decrypted.Length - separatorIndex - 1];
-                Buffer.BlockCopy(decrypted, separatorIndex + 1, fileBytes, 0, fileBytes.Length);
+                if (fileDto != null)
+                {
+                    string downloadsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                    string filePath = Path.Combine(downloadsPath, fileDto.FileName);
 
-                // Lưu file
-                string downloadsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-                string path = Path.Combine(downloadsPath, fileName);
-                File.WriteAllBytes(path, fileBytes);
+                    File.WriteAllBytes(filePath, fileDto.FileData);
 
-                // Mở thư mục
-                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\"");
+                    // 3. Tự động mở thư mục và chọn file (Tham khảo từ RemoteDesktop)
+                    System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{filePath}\"");
 
-                return fileName;
+                    return fileDto.FileName;
+                }
             }
-            catch (Exception ex)
-            {
-                // Ghi log ra Console hoặc ném lỗi để frmMain xử lý
-                Console.WriteLine("Lỗi nhận file: " + ex.Message);
-                return null;
-            }
+            catch (Exception ex) { Console.WriteLine("Lỗi nhận file: " + ex.Message); }
+            return null;
         }
     }
 }

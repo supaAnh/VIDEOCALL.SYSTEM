@@ -106,12 +106,27 @@ namespace CLIENT.View
             //
             else if (package.Type == PackageType.SendFile)
             {
-                string fileName = _fileProcess.ProcessIncomingFile(package.Content);
-                this.Invoke(new Action(() => {
-                    txtChatBox.AppendText($"[{_selectedTargetIP}] đã gửi file: {fileName} (Đã lưu vào Downloads){Environment.NewLine}");
+                this.Invoke(new Action(() =>
+                {
+                    try
+                    {
+                        string fileName = _fileProcess.ProcessIncomingFile(package.Content);
+                        if (!string.IsNullOrEmpty(fileName))
+                        {
+                            // Hiển thị thông báo lên khung chat
+                            txtChatBox.AppendText($"[Hệ thống]: Nhận file thành công: {fileName}{Environment.NewLine}");
+                            MessageBox.Show($"Bạn đã nhận được file: {fileName}");
+                        }
+                        else
+                        {
+                            txtChatBox.AppendText($"[Hệ thống]: Nhận file thất bại (Lỗi giải mã hoặc định dạng).{Environment.NewLine}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        txtChatBox.AppendText($"[Hệ thống]: Lỗi khi nhận file: {ex.Message}{Environment.NewLine}");
+                    }
                 }));
-
-                MessageBox.Show($"Nhận file {fileName} thành công!");
             }
             //
             // Tin nhắn nhóm

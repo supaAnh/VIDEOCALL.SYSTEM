@@ -50,26 +50,37 @@ namespace CLIENT.Logic
 
         public string ProcessIncomingFile(byte[] encryptedData)
         {
-            // Giải mã bằng khóa AES
-            byte[] decrypted = AES_Service.Decrypt(encryptedData, _client.AesKey);
-
-            int separatorIndex = Array.IndexOf(decrypted, (byte)'|');
-            if (separatorIndex != -1)
+            try
             {
+                if (_client.AesKey == null) throw new Exception("Chưa có khóa AES.");
+
+                // Giải mã
+                byte[] decrypted = AES_Service.Decrypt(encryptedData, _client.AesKey);
+
+                // Tìm dấu phân tách '|'
+                int separatorIndex = Array.IndexOf(decrypted, (byte)'|');
+                if (separatorIndex == -1) throw new Exception("Định dạng file không hợp lệ (thiếu dấu phân tách).");
+
                 string fileName = Encoding.UTF8.GetString(decrypted, 0, separatorIndex);
                 byte[] fileBytes = new byte[decrypted.Length - separatorIndex - 1];
                 Buffer.BlockCopy(decrypted, separatorIndex + 1, fileBytes, 0, fileBytes.Length);
 
+                // Lưu file
                 string downloadsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
                 string path = Path.Combine(downloadsPath, fileName);
                 File.WriteAllBytes(path, fileBytes);
 
-                // KHẮC PHỤC LỖI CS0103/CS0234: Dùng đường dẫn đầy đủ của System.Diagnostics
+                // Mở thư mục
                 System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\"");
 
                 return fileName;
             }
-            return null;
+            catch (Exception ex)
+            {
+                // Ghi log ra Console hoặc ném lỗi để frmMain xử lý
+                Console.WriteLine("Lỗi nhận file: " + ex.Message);
+                return null;
+            }
         }
     }
 }

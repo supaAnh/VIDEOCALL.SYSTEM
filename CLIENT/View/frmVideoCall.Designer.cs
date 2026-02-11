@@ -34,6 +34,8 @@
             contextMenuStrip1 = new ContextMenuStrip(components);
             mờiThamGiaToolStripMenuItem = new ToolStripMenuItem();
             thoátToolStripMenuItem = new ToolStripMenuItem();
+            btnCamera = new Button();
+            btnMicrophone = new Button();
             contextMenuStrip1.SuspendLayout();
             SuspendLayout();
             // 
@@ -52,12 +54,13 @@
             // 
             // btnSelectionVideoCall
             // 
+            btnSelectionVideoCall.BackColor = Color.Gainsboro;
             btnSelectionVideoCall.Location = new Point(12, 12);
             btnSelectionVideoCall.Name = "btnSelectionVideoCall";
             btnSelectionVideoCall.Size = new Size(77, 43);
             btnSelectionVideoCall.TabIndex = 1;
             btnSelectionVideoCall.Text = "Chọn";
-            btnSelectionVideoCall.UseVisualStyleBackColor = true;
+            btnSelectionVideoCall.UseVisualStyleBackColor = false;
             btnSelectionVideoCall.Click += btnSelectionVideoCall_Click;
             // 
             // contextMenuStrip1
@@ -79,11 +82,34 @@
             thoátToolStripMenuItem.Size = new Size(167, 24);
             thoátToolStripMenuItem.Text = "Thoát";
             // 
+            // btnCamera
+            // 
+            btnCamera.BackColor = Color.LightGreen;
+            btnCamera.Location = new Point(991, 12);
+            btnCamera.Name = "btnCamera";
+            btnCamera.Size = new Size(77, 43);
+            btnCamera.TabIndex = 2;
+            btnCamera.Text = "Cam";
+            btnCamera.UseVisualStyleBackColor = false;
+            // 
+            // btnMicrophone
+            // 
+            btnMicrophone.BackColor = Color.LightGreen;
+            btnMicrophone.Location = new Point(908, 12);
+            btnMicrophone.Name = "btnMicrophone";
+            btnMicrophone.Size = new Size(77, 43);
+            btnMicrophone.TabIndex = 3;
+            btnMicrophone.Text = "Mic";
+            btnMicrophone.UseVisualStyleBackColor = false;
+            // 
             // frmVideoCall
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
+            BackColor = Color.White;
             ClientSize = new Size(1081, 607);
+            Controls.Add(btnMicrophone);
+            Controls.Add(btnCamera);
             Controls.Add(btnSelectionVideoCall);
             Controls.Add(tableLayoutPanel1);
             Name = "frmVideoCall";
@@ -100,5 +126,7 @@
         private ContextMenuStrip contextMenuStrip1;
         private ToolStripMenuItem mờiThamGiaToolStripMenuItem;
         private ToolStripMenuItem thoátToolStripMenuItem;
+        private Button btnCamera;
+        private Button btnMicrophone;
     }
 }

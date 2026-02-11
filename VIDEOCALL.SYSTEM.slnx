@@ -1,5 +1,15 @@
 <Solution>
-  <Project Path="CLIENT/CLIENT.csproj" />
-  <Project Path="COMMON/COMMON.csproj" />
-  <Project Path="SERVER/SERVER.csproj" />
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="CLIENT/CLIENT.csproj">
+    <Platform Solution="*|x86" Project="x86" />
+  </Project>
+  <Project Path="COMMON/COMMON.csproj">
+    <Platform Solution="*|x86" Project="x86" />
+  </Project>
+  <Project Path="SERVER/SERVER.csproj">
+    <Platform Solution="*|x86" Project="x86" />
+  </Project>
 </Solution>

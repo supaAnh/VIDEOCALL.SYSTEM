@@ -19,11 +19,17 @@ namespace CLIENT.View
         // File logic xử lý gửi/nhận file
         private Logic.FileProcess _fileProcess;
 
+        // Xử lý cuộc gọi video
+        private Process.VideoCallProcess _videoCallLogic;
+
         private byte[] aesKey;
 
         // Lưu trữ IP của người dùng đang chat
         private string _selectedTargetIP = "";
         private Process.ChatLogic _chatLogic;
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public string SelectedMoniker { get; set; }
 
         public frmMain(ClientSocketConnect client)
         {
@@ -44,6 +50,8 @@ namespace CLIENT.View
             // Khởi tạo FileLogic
             _fileProcess = new Logic.FileProcess(_client);
 
+            // Khởi tạo VideoCallProcess
+            _videoCallLogic = new Process.VideoCallProcess(_client);
 
             // Đăng ký sự kiện Load của Form
             this.Load += FrmMain_Load;
@@ -192,6 +200,57 @@ namespace CLIENT.View
             }
 
             //
+            // Cuộc gọi video
+            //
+            else if (package.Type == PackageType.VideoCall)
+            {
+                string rawSignal = Encoding.UTF8.GetString(package.Content);
+                string[] parts = rawSignal.Split('|');
+                string senderIP = parts[0];
+                string status = parts[1];
+
+                this.Invoke(new Action(() => {
+                    switch (status)
+                    {
+                        case "Request":
+                            var res = MessageBox.Show($"Cuộc gọi từ {senderIP}. Đồng ý?", "Video Call", MessageBoxButtons.YesNo);
+                            if (res == DialogResult.Yes)
+                            {
+                                // 1. Sửa tên Form từ frmDeviceSelection thành frmSelectOption
+                                using (frmSelectOption sd = new frmSelectOption())
+                                {
+                                    if (sd.ShowDialog() == DialogResult.OK)
+                                    {
+                                        _videoCallLogic.SendVideoCallSignal(senderIP, "Accept");
+
+                                        // 2. Sửa lỗi biến 'selectDevice' không tồn tại thành 'sd' (tên biến instance bạn vừa tạo)
+                                        // 3. Sử dụng 'senderIP' thay vì '_selectedTargetIP' vì đây là người đang gọi đến bạn
+                                        frmVideoCall callForm = new frmVideoCall(senderIP, sd.SelectedMoniker, _videoCallLogic);
+                                        callForm.Show();
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                _videoCallLogic.SendVideoCallSignal(senderIP, "Refuse");
+                            }
+                            break;
+
+                        case "Accept":
+                            // Logic khi đối phương đồng ý: Bạn cần mở Form Video Call tại đây
+                            // Lưu ý: Cần lấy được Moniker mà bạn đã chọn từ lúc gửi Request
+                            MessageBox.Show("Đối phương đã chấp nhận cuộc gọi.");
+                            break;
+
+                        case "Refuse":
+                            MessageBox.Show("Đối phương đã từ chối cuộc gọi.");
+                            // Thêm logic để tìm và đóng frmVideoCall đang ở trạng thái chờ (Ringing) nếu có
+                            break;
+                    }
+                }));
+            }
+
+            //
             // Thiết lập kết nối bảo mật (nhận khóa DH từ server)
             //
             else if (package.Type == PackageType.DH_KeyExchange)
@@ -208,10 +267,19 @@ namespace CLIENT.View
 
         private void btnCallVideo_Click(object sender, EventArgs e)
         {
-            if (btnCallVideo.Enabled)
+            if (string.IsNullOrEmpty(_selectedTargetIP)) return;
+
+            using (frmSelectOption selectDevice = new frmSelectOption())
             {
-                frmVideoCall videoCallForm = new frmVideoCall();
-                videoCallForm.Show();
+                if (selectDevice.ShowDialog() == DialogResult.OK)
+                {
+                    // Truyền IP mục tiêu, Moniker thiết bị và tham chiếu logic vào Form
+                    frmVideoCall callForm = new frmVideoCall(_selectedTargetIP, selectDevice.SelectedMoniker, _videoCallLogic);
+                    callForm.Show();
+
+                    // Gửi tín hiệu yêu cầu gọi
+                    _videoCallLogic.SendSignal(_selectedTargetIP, "Request");
+                }
             }
         }
 

@@ -68,19 +68,20 @@
             contextMenuStrip1.ImageScalingSize = new Size(20, 20);
             contextMenuStrip1.Items.AddRange(new ToolStripItem[] { mờiThamGiaToolStripMenuItem, thoátToolStripMenuItem });
             contextMenuStrip1.Name = "contextMenuStrip1";
-            contextMenuStrip1.Size = new Size(168, 52);
+            contextMenuStrip1.Size = new Size(211, 80);
             // 
             // mờiThamGiaToolStripMenuItem
             // 
             mờiThamGiaToolStripMenuItem.Name = "mờiThamGiaToolStripMenuItem";
-            mờiThamGiaToolStripMenuItem.Size = new Size(167, 24);
+            mờiThamGiaToolStripMenuItem.Size = new Size(210, 24);
             mờiThamGiaToolStripMenuItem.Text = "Mời tham gia";
             // 
             // thoátToolStripMenuItem
             // 
             thoátToolStripMenuItem.Name = "thoátToolStripMenuItem";
-            thoátToolStripMenuItem.Size = new Size(167, 24);
+            thoátToolStripMenuItem.Size = new Size(210, 24);
             thoátToolStripMenuItem.Text = "Thoát";
+            thoátToolStripMenuItem.Click += thoátToolStripMenuItem_Click;
             // 
             // btnCamera
             // 

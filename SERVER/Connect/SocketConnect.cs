@@ -48,9 +48,9 @@ public class SocketConnect
         // Thiết lập địa chỉ IP và cổng
         IP = new IPEndPoint(IPAddress.Any, port);
         server = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        
-        
-        
+
+
+
         try
         {
             server.Bind(IP);
@@ -318,10 +318,45 @@ public class SocketConnect
                     }
                 }
                 break;
+
+            // 8. Tín hiệu Video Call (Chuyển tiếp tín hiệu, không xử lý trực tiếp)
+            case PackageType.VideoCall:
+                string vData = Encoding.UTF8.GetString(package.Content);
+                if (!vData.Contains("|")) break;
+
+                string[] vParts = vData.Split('|');
+                string vTarget = vParts[0]; // IP người nhận hoặc tên Group
+                string vAction = vParts[1]; // Request, Accept, Frame, Audio...
+                string vRawPayload = vParts[2]; // Dữ liệu thực tế
+
+                // Đổi tên thành videoForwardPayload để tránh lỗi "enclosing local scope"
+                string videoForwardPayload = $"{senderIP}|{vAction}|{vRawPayload}";
+                byte[] vContent = Encoding.UTF8.GetBytes(videoForwardPayload);
+
+                // Đóng gói lại thành DataPackage để gửi đi
+                byte[] vFinalPackage = new DataPackage(PackageType.VideoCall, vContent).Pack();
+
+                if (groupMembersTable.ContainsKey(vTarget))
+                {
+                    // Nếu là nhóm, gửi cho các thành viên trong nhóm trừ người gửi
+                    BroadcastToGroup(groupMembersTable[vTarget], videoForwardPayload, senderSocket);
+                }
+                else
+                {
+                    // Nếu là cá nhân, sử dụng hàm ForwardToTarget (hoặc MessageDispatcher)
+                    SERVER.Process.MessageDispatcher.ForwardToTarget(vTarget, vFinalPackage, clientKeys);
+                }
+                break;
         }
     }
 
-    // Hàm bổ trợ: Chuyển tiếp tin nhắn riêng
+
+
+
+    // Hàm bổ trợ
+
+    // Gửi trực tiếp đến một client dựa trên IP
+
     private void ForwardToClient(string targetIP, string senderIP, string content, PackageType type)
     {
         lock (clientKeys)
@@ -330,15 +365,18 @@ public class SocketConnect
             {
                 if (item.Key.RemoteEndPoint.ToString() == targetIP && item.Key.Connected)
                 {
-                    string data = (type == PackageType.SecureMessage) ? $"{senderIP}|{content}" : content;
-                    byte[] enc = AES_Service.EncryptString(data, item.Value);
+                    // tin nhắn bảo mật hoặc Video Call cần đính kèm IP người gửi
+                    string dataToSend = (type == PackageType.SecureMessage || type == PackageType.VideoCall)
+                                        ? $"{senderIP}|{content}"
+                                        : content;
+
+                    byte[] enc = AES_Service.EncryptString(dataToSend, item.Value);
                     item.Key.Send(new DataPackage(type, enc).Pack());
                     return;
                 }
             }
         }
     }
-
     // Hàm bổ trợ: Gửi cho danh sách IP cụ thể
     private void BroadcastToList(List<string> ips, byte[] data)
     {

@@ -17,7 +17,8 @@ namespace COMMON.DTO
         RequestChatHistory = 8, // Yêu cầu lịch sử chat
         CreateGroup = 9,      // Client yêu cầu tạo nhóm
         GroupUpdate = 10,     // Server thông báo có nhóm mới cho các thành viên
-        GroupMessage = 11     // Tin nhắn gửi trong nhóm
+        GroupMessage = 11,     // Tin nhắn gửi trong nhóm
+        VideoCallSignal = 12, // Tín hiệu điều khiển cuộc gọi video (như yêu cầu, từ chối, kết thúc)
     }
 
     public class DataPackage

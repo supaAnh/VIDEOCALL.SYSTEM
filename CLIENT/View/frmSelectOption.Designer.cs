@@ -1,6 +1,6 @@
 ﻿namespace CLIENT.View
 {
-    partial class frmDeviceSelection
+    partial class frmSelectOption
     {
         /// <summary>
         /// Required designer variable.
@@ -41,6 +41,7 @@
             progessBarMic = new ProgressBar();
             btnOutputTest = new Button();
             label4 = new Label();
+            btnJoin = new Button();
             ((System.ComponentModel.ISupportInitialize)pictureBoxCamPreview).BeginInit();
             SuspendLayout();
             // 
@@ -49,6 +50,7 @@
             pictureBoxCamPreview.Location = new Point(12, 12);
             pictureBoxCamPreview.Name = "pictureBoxCamPreview";
             pictureBoxCamPreview.Size = new Size(414, 279);
+            pictureBoxCamPreview.SizeMode = PictureBoxSizeMode.StretchImage;
             pictureBoxCamPreview.TabIndex = 0;
             pictureBoxCamPreview.TabStop = false;
             // 
@@ -72,17 +74,18 @@
             // 
             // btnExit
             // 
-            btnExit.Location = new Point(674, 394);
+            btnExit.Location = new Point(659, 391);
             btnExit.Name = "btnExit";
             btnExit.Size = new Size(98, 44);
             btnExit.TabIndex = 4;
             btnExit.Text = "Thoát";
             btnExit.UseVisualStyleBackColor = true;
+            btnExit.Click += btnExit_Click;
             // 
             // cbCamera
             // 
             cbCamera.FormattingEnabled = true;
-            cbCamera.Location = new Point(558, 51);
+            cbCamera.Location = new Point(543, 48);
             cbCamera.Name = "cbCamera";
             cbCamera.Size = new Size(214, 28);
             cbCamera.TabIndex = 5;
@@ -90,7 +93,7 @@
             // label1
             // 
             label1.AutoSize = true;
-            label1.Location = new Point(481, 54);
+            label1.Location = new Point(466, 51);
             label1.Name = "label1";
             label1.Size = new Size(60, 20);
             label1.TabIndex = 6;
@@ -99,7 +102,7 @@
             // label2
             // 
             label2.AutoSize = true;
-            label2.Location = new Point(481, 96);
+            label2.Location = new Point(466, 93);
             label2.Name = "label2";
             label2.Size = new Size(55, 20);
             label2.TabIndex = 8;
@@ -108,7 +111,7 @@
             // cbOutput
             // 
             cbOutput.FormattingEnabled = true;
-            cbOutput.Location = new Point(558, 93);
+            cbOutput.Location = new Point(543, 90);
             cbOutput.Name = "cbOutput";
             cbOutput.Size = new Size(214, 28);
             cbOutput.TabIndex = 7;
@@ -116,7 +119,7 @@
             // label3
             // 
             label3.AutoSize = true;
-            label3.Location = new Point(481, 187);
+            label3.Location = new Point(466, 184);
             label3.Name = "label3";
             label3.Size = new Size(43, 20);
             label3.TabIndex = 10;
@@ -125,21 +128,21 @@
             // cbInput
             // 
             cbInput.FormattingEnabled = true;
-            cbInput.Location = new Point(558, 184);
+            cbInput.Location = new Point(543, 181);
             cbInput.Name = "cbInput";
             cbInput.Size = new Size(214, 28);
             cbInput.TabIndex = 9;
             // 
             // progessBarMic
             // 
-            progessBarMic.Location = new Point(558, 231);
+            progessBarMic.Location = new Point(543, 228);
             progessBarMic.Name = "progessBarMic";
             progessBarMic.Size = new Size(212, 10);
             progessBarMic.TabIndex = 11;
             // 
             // btnOutputTest
             // 
-            btnOutputTest.Location = new Point(693, 127);
+            btnOutputTest.Location = new Point(678, 124);
             btnOutputTest.Name = "btnOutputTest";
             btnOutputTest.Size = new Size(79, 40);
             btnOutputTest.TabIndex = 12;
@@ -149,17 +152,28 @@
             // label4
             // 
             label4.AutoSize = true;
-            label4.Location = new Point(481, 221);
+            label4.Location = new Point(466, 218);
             label4.Name = "label4";
             label4.Size = new Size(62, 20);
             label4.TabIndex = 13;
             label4.Text = "Thử mic";
             // 
-            // frmDeviceSelection
+            // btnJoin
+            // 
+            btnJoin.Location = new Point(569, 297);
+            btnJoin.Name = "btnJoin";
+            btnJoin.Size = new Size(98, 44);
+            btnJoin.TabIndex = 14;
+            btnJoin.Text = "Tham gia";
+            btnJoin.UseVisualStyleBackColor = true;
+            btnJoin.Click += btnJoin_Click;
+            // 
+            // frmSelectOption
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(784, 450);
+            ClientSize = new Size(769, 450);
+            Controls.Add(btnJoin);
             Controls.Add(label4);
             Controls.Add(btnOutputTest);
             Controls.Add(progessBarMic);
@@ -174,7 +188,8 @@
             Controls.Add(btnCamera);
             Controls.Add(pictureBoxCamPreview);
             MaximizeBox = false;
-            Name = "frmDeviceSelection";
+            Name = "frmSelectOption";
+            StartPosition = FormStartPosition.CenterScreen;
             Text = "CLIENT - Preview";
             ((System.ComponentModel.ISupportInitialize)pictureBoxCamPreview).EndInit();
             ResumeLayout(false);
@@ -196,5 +211,6 @@
         private ProgressBar progessBarMic;
         private Button btnOutputTest;
         private Label label4;
+        private Button btnJoin;
     }
 }

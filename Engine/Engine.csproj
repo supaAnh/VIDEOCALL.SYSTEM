@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Accord.Video.FFMPEG" Version="3.8.2-alpha" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="C:\Users\ACER\.nuget\packages\accord.video.ffmpeg\3.8.2-alpha\build\avcodec-57.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="C:\Users\ACER\.nuget\packages\accord.video.ffmpeg\3.8.2-alpha\build\avdevice-57.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="C:\Users\ACER\.nuget\packages\accord.video.ffmpeg\3.8.2-alpha\build\avdevice-57.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="C:\Users\ACER\.nuget\packages\accord.video.ffmpeg\3.8.2-alpha\build\avcodec-57.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="C:\Users\ACER\.nuget\packages\accord.video.ffmpeg\3.8.2-alpha\build\avfilter-6.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="C:\Users\ACER\.nuget\packages\accord.video.ffmpeg\3.8.2-alpha\build\avformat-57.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="C:\Users\ACER\.nuget\packages\accord.video.ffmpeg\3.8.2-alpha\build\avutil-55.dll" />
+  </ItemGroup>
+
+</Project>

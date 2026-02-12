@@ -51,10 +51,7 @@ namespace CLIENT.Process
 
                     if (parts.Length >= 3)
                     {
-                        // Protocol hiện tại: TargetIP|Action|Data
-                        // Người nhận sẽ không biết IP người gửi nếu server không gửi kèm.
-                        // Tạm thời gán là "Partner" để hiển thị.
-                        string senderIP = "Partner";
+                        string senderIP = parts[0];
                         string action = parts[1]; // "Frame" hoặc "Audio"
                         string payload = parts[2]; // Dữ liệu mã hóa Base64
 

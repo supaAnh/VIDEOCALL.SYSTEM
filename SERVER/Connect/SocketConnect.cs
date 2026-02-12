@@ -320,29 +320,57 @@ public class SocketConnect
                 break;
 
             // 8. Tín hiệu Video Call (Chuyển tiếp tín hiệu, không xử lý trực tiếp)
+            // [SERVER/Connect/SocketConnect.cs]
+
             case PackageType.VideoCall:
-                string vData = Encoding.UTF8.GetString(package.Content);
-                if (!vData.Contains("|")) break;
-
-                string[] vParts = vData.Split('|');
-                string vTarget = vParts[0];
-                string vAction = vParts[1];
-                string vRawPayload = vParts.Length >= 3 ? vParts[2] : "";
-
-                // Đảm bảo tạo gói tin mới với IP của người gửi thực tế để Client nhận biết được ai đang gửi
-                string videoForwardPayload = $"{senderIP}|{vAction}|{vRawPayload}";
-                byte[] vContent = Encoding.UTF8.GetBytes(videoForwardPayload);
-                byte[] vFinalPackage = new DataPackage(PackageType.VideoCall, vContent).Pack();
-
-                if (groupMembersTable.ContainsKey(vTarget))
                 {
-                    // Xử lý nhóm
-                    BroadcastToGroup(groupMembersTable[vTarget], videoForwardPayload, senderSocket);
-                }
-                else
-                {
-                    // Chuyển tiếp đơn: Sử dụng vFinalPackage đã đóng gói IP người gửi
-                    SERVER.Process.MessageDispatcher.ForwardToTarget(vTarget, vFinalPackage, clientKeys);
+                    string vData = Encoding.UTF8.GetString(package.Content);
+                    if (!vData.Contains("|")) break;
+
+                    string[] vParts = vData.Split('|');
+                    string vTarget = vParts[0];
+                    string vAction = vParts[1]; // "Request", "Frame", "Audio", "Accept", ...
+                    string vRawPayload = vParts.Length >= 3 ? vParts[2] : "";
+
+                    if (clientKeys.TryGetValue(senderSocket, out byte[] videoSenderKey))
+                    {
+                        lock (clientKeys)
+                        {
+                            foreach (var item in clientKeys)
+                            {
+                                if (item.Key.RemoteEndPoint.ToString() == vTarget && item.Key.Connected)
+                                {
+                                    try
+                                    {
+                                        string finalPayload = vRawPayload; // Mặc định giữ nguyên (cho Request, Accept...)
+
+                                        // CHỈ xử lý giải mã/mã hóa nếu là Frame hoặc Audio
+                                        if ((vAction == "Frame" || vAction == "Audio") && !string.IsNullOrEmpty(vRawPayload))
+                                        {
+                                            // 1. Giải mã bằng Key người gửi
+                                            byte[] encryptedBytes = Convert.FromBase64String(vRawPayload);
+                                            byte[] originalData = AES_Service.Decrypt(encryptedBytes, videoSenderKey);
+
+                                            // 2. Mã hóa lại bằng Key người nhận
+                                            byte[] reEncryptedBytes = AES_Service.Encrypt(originalData, item.Value);
+                                            finalPayload = Convert.ToBase64String(reEncryptedBytes);
+                                        }
+
+                                        // 3. Đóng gói tin nhắn (Thay IP đích bằng IP người gửi để Client nhận biết ai gọi)
+                                        string videoForwardPayload = $"{senderIP}|{vAction}|{finalPayload}";
+                                        byte[] vContent = Encoding.UTF8.GetBytes(videoForwardPayload);
+
+                                        item.Key.Send(new DataPackage(PackageType.VideoCall, vContent).Pack());
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        LogViewUI.AddLog($"Lỗi chuyển tiếp Video ({vAction}): {ex.Message}");
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
                 break;
         }

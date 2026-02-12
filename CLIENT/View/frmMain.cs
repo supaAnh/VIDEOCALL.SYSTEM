@@ -200,12 +200,11 @@ namespace CLIENT.View
             string rawSignal = Encoding.UTF8.GetString(content);
             string[] parts = rawSignal.Split('|');
 
-            // Tín hiệu tối thiểu phải có 2 phần: [SenderIP] và [Status]
+            // Cấu trúc nhận được: [SenderIP]|[Status]|[Payload]
             if (parts.Length < 2) return;
 
             string senderIP = parts[0];
             string status = parts[1];
-            // Payload chỉ có khi status là Frame hoặc Audio
             string payload = parts.Length >= 3 ? parts[2] : "";
 
             this.Invoke(new Action(() =>
@@ -213,7 +212,7 @@ namespace CLIENT.View
                 switch (status)
                 {
                     case "Request":
-                        // Hiển thị thông báo khi có người gọi đến
+                        // Hiển thị thông báo mời họp video
                         var res = MessageBox.Show($"Cuộc gọi video từ {senderIP}. Đồng ý?",
                                   "Video Call", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
@@ -223,20 +222,15 @@ namespace CLIENT.View
                             {
                                 if (sd.ShowDialog() == DialogResult.OK)
                                 {
-                                    _videoCallLogic.SendVideoCallSignal(senderIP, "Accept");
+                                    // Gửi tín hiệu chấp nhận
+                                    _videoCallLogic.SendVideoCallSignal(senderIP, "Đồng ý");
                                     frmVideoCall callForm = new frmVideoCall(senderIP, sd.SelectedMoniker, _videoCallLogic);
                                     callForm.Show();
                                 }
-                                else
-                                {
-                                    _videoCallLogic.SendVideoCallSignal(senderIP, "Refuse");
-                                }
+                                else { _videoCallLogic.SendVideoCallSignal(senderIP, "Từ chối"); }
                             }
                         }
-                        else
-                        {
-                            _videoCallLogic.SendVideoCallSignal(senderIP, "Refuse");
-                        }
+                        else { _videoCallLogic.SendVideoCallSignal(senderIP, "Từ chối"); }
                         break;
 
                     case "Frame":

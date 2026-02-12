@@ -33,12 +33,14 @@ namespace CLIENT.Process
         /// <summary>
         /// Gửi tín hiệu điều khiển cuộc gọi (Invite, Ringing, Busy, End...)
         /// </summary>
+        // CLIENT/Process/VideoCallProcess.cs
+
         public void SendSignal(string target, string status)
         {
             try
             {
-
-                string signalData = $"{target}|{status}";
+                // Thêm "| " ở cuối để tránh lỗi IndexOutOfRangeException tại Server
+                string signalData = $"{target}|{status}| ";
                 byte[] content = Encoding.UTF8.GetBytes(signalData);
                 _client.Send(new DataPackage(PackageType.VideoCall, content).Pack());
             }

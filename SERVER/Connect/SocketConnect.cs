@@ -325,25 +325,24 @@ public class SocketConnect
                 if (!vData.Contains("|")) break;
 
                 string[] vParts = vData.Split('|');
-                string vTarget = vParts[0]; // IP người nhận hoặc tên Group
-                string vAction = vParts[1]; // Request, Accept, Frame, Audio...
-                string vRawPayload = vParts[2]; // Dữ liệu thực tế
+                if (vParts.Length < 2) break; // Kiểm tra an toàn
 
-                // Đổi tên thành videoForwardPayload để tránh lỗi "enclosing local scope"
+                string vTarget = vParts[0];
+                string vAction = vParts[1];
+                // Kiểm tra nếu có phần tử thứ 3 thì lấy, không thì để trống
+                string vRawPayload = vParts.Length >= 3 ? vParts[2] : "";
+
+                // Đóng gói lại để chuyển tiếp
                 string videoForwardPayload = $"{senderIP}|{vAction}|{vRawPayload}";
                 byte[] vContent = Encoding.UTF8.GetBytes(videoForwardPayload);
-
-                // Đóng gói lại thành DataPackage để gửi đi
                 byte[] vFinalPackage = new DataPackage(PackageType.VideoCall, vContent).Pack();
 
                 if (groupMembersTable.ContainsKey(vTarget))
                 {
-                    // Nếu là nhóm, gửi cho các thành viên trong nhóm trừ người gửi
                     BroadcastToGroup(groupMembersTable[vTarget], videoForwardPayload, senderSocket);
                 }
                 else
                 {
-                    // Nếu là cá nhân, sử dụng hàm ForwardToTarget (hoặc MessageDispatcher)
                     SERVER.Process.MessageDispatcher.ForwardToTarget(vTarget, vFinalPackage, clientKeys);
                 }
                 break;

@@ -325,24 +325,23 @@ public class SocketConnect
                 if (!vData.Contains("|")) break;
 
                 string[] vParts = vData.Split('|');
-                if (vParts.Length < 2) break; // Kiểm tra an toàn
-
                 string vTarget = vParts[0];
                 string vAction = vParts[1];
-                // Kiểm tra nếu có phần tử thứ 3 thì lấy, không thì để trống
                 string vRawPayload = vParts.Length >= 3 ? vParts[2] : "";
 
-                // Đóng gói lại để chuyển tiếp
+                // Đảm bảo tạo gói tin mới với IP của người gửi thực tế để Client nhận biết được ai đang gửi
                 string videoForwardPayload = $"{senderIP}|{vAction}|{vRawPayload}";
                 byte[] vContent = Encoding.UTF8.GetBytes(videoForwardPayload);
                 byte[] vFinalPackage = new DataPackage(PackageType.VideoCall, vContent).Pack();
 
                 if (groupMembersTable.ContainsKey(vTarget))
                 {
+                    // Xử lý nhóm
                     BroadcastToGroup(groupMembersTable[vTarget], videoForwardPayload, senderSocket);
                 }
                 else
                 {
+                    // Chuyển tiếp đơn: Sử dụng vFinalPackage đã đóng gói IP người gửi
                     SERVER.Process.MessageDispatcher.ForwardToTarget(vTarget, vFinalPackage, clientKeys);
                 }
                 break;

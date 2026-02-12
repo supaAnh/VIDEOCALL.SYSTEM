@@ -13,7 +13,8 @@ namespace CLIENT.View
     public partial class frmVideoCall : Form
     {
         private string _targetIP;
-        private string _myMoniker;
+
+        public string myMoniker { get; private set; }
 
         private CLIENT.Process.VideoCallProcess _videoCallLogic;
 
@@ -27,24 +28,29 @@ namespace CLIENT.View
             InitializeComponent();
             _videoCallLogic = videoLogic;
             _targetIP = targetIP;
-            _myMoniker = moniker;
+            this.myMoniker = moniker;
+
+            // 1. Phải khởi tạo Audio Playback để tránh lỗi luồng
+            InitAudioPlayback();
 
             _videoCallLogic.OnFrameReceived += (senderIP, bmp) =>
             {
+                if (this.IsDisposed) return;
                 this.BeginInvoke(new Action(() => {
-                    // LUÔN KIỂM TRA: Nếu chưa có PictureBox cho IP này thì phải tạo mới
+                    // Nếu là người mới (không phải "Me" và chưa có trong danh sách)
                     if (!_participantVideos.ContainsKey(senderIP))
                     {
                         AddParticipant(senderIP);
                     }
-
-                    // Cập nhật frame sau khi đã chắc chắn có PictureBox
                     UpdateFrame(senderIP, bmp);
                 }));
             };
 
-            _videoCallLogic.StartStreaming(_targetIP, _myMoniker);
-            AddParticipant("Me"); // Thêm khung hình của chính mình
+            // 2. Bắt đầu stream
+            _videoCallLogic.StartStreaming(_targetIP, myMoniker);
+
+            // 3. Thêm chính mình vào giao diện
+            AddParticipant("Me");
         }
 
         //
@@ -65,12 +71,12 @@ namespace CLIENT.View
                 SizeMode = PictureBoxSizeMode.StretchImage,
                 BackColor = Color.Black,
                 BorderStyle = BorderStyle.FixedSingle,
-                Dock = DockStyle.Fill // Thiết lập ngay khi tạo
+                Dock = DockStyle.Fill
             };
 
             _participantVideos.Add(participantID, pb);
 
-            // Gọi hàm cập nhật layout ngay sau khi thêm
+            // Gọi cập nhật bố cục ngay lập tức
             UpdateVideoLayout();
         }
 
@@ -79,15 +85,10 @@ namespace CLIENT.View
         //
         private void UpdateVideoLayout()
         {
-            if (this.InvokeRequired)
-            {
-                this.Invoke(new Action(UpdateVideoLayout));
-                return;
-            }
-
             int count = _participantVideos.Count;
             if (count == 0) return;
 
+            // Tính toán số cột và hàng (VD: 2 người -> 2 cột, 1 hàng)
             int cols = (count <= 1) ? 1 : (count <= 2) ? 2 : (int)Math.Ceiling(Math.Sqrt(count));
             int rows = (int)Math.Ceiling((double)count / cols);
 
@@ -99,26 +100,22 @@ namespace CLIENT.View
             tableLayoutPanel1.ColumnCount = cols;
             tableLayoutPanel1.RowCount = rows;
 
-            // Thiết lập tỷ lệ phần trăm cho cột và hàng
+            // Chia đều 100% không gian cho các cột và hàng
             for (int i = 0; i < cols; i++)
                 tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / cols));
             for (int i = 0; i < rows; i++)
                 tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / rows));
 
-            // Quan trọng: Gán PictureBox vào đúng vị trí lưới
             int current = 0;
             foreach (var pb in _participantVideos.Values)
             {
-                pb.Dock = DockStyle.Fill;
-                pb.Margin = new Padding(2);
                 int r = current / cols;
                 int c = current % cols;
-                tableLayoutPanel1.Controls.Add(pb, c, r); // Thêm kèm vị trí cột, hàng
+                tableLayoutPanel1.Controls.Add(pb, c, r);
                 current++;
             }
 
             tableLayoutPanel1.ResumeLayout();
-            tableLayoutPanel1.Refresh(); // Buộc vẽ lại giao diện
         }
 
         //

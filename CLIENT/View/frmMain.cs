@@ -212,7 +212,6 @@ namespace CLIENT.View
                 switch (status)
                 {
                     case "Request":
-                        // Hiển thị thông báo mời họp video
                         var res = MessageBox.Show($"Cuộc gọi video từ {senderIP}. Đồng ý?",
                                   "Video Call", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
@@ -222,15 +221,20 @@ namespace CLIENT.View
                             {
                                 if (sd.ShowDialog() == DialogResult.OK)
                                 {
-                                    // Gửi tín hiệu chấp nhận
-                                    _videoCallLogic.SendVideoCallSignal(senderIP, "Đồng ý");
-                                    frmVideoCall callForm = new frmVideoCall(senderIP, sd.SelectedMoniker, _videoCallLogic);
-                                    callForm.Show();
+                                    // Gửi tín hiệu chấp nhận TRƯỚC để Server bắt đầu forward dữ liệu
+                                    _videoCallLogic.SendVideoCallSignal(senderIP, "Accept");
+
+                                    // Khởi tạo Form và thêm ngay senderIP vào danh sách để scale lưới ngay lập tức
+                                    frmVideoCall activeCallForm = new frmVideoCall(senderIP, sd.SelectedMoniker, _videoCallLogic);
+
+                                    // Thêm thủ công đối phương vào Form của Client 2
+                                    activeCallForm.AddParticipant(senderIP);
+
+                                    activeCallForm.Show();
                                 }
-                                else { _videoCallLogic.SendVideoCallSignal(senderIP, "Từ chối"); }
+                                else { _videoCallLogic.SendVideoCallSignal(senderIP, "Refuse"); }
                             }
                         }
-                        else { _videoCallLogic.SendVideoCallSignal(senderIP, "Từ chối"); }
                         break;
 
                     case "Frame":
@@ -242,7 +246,13 @@ namespace CLIENT.View
                         break;
 
                     case "Accept":
-                        MessageBox.Show($"[{senderIP}] đã chấp nhận cuộc gọi.");
+                        var callForm = Application.OpenForms.OfType<frmVideoCall>().FirstOrDefault();
+                        if (callForm != null)
+                        {
+                            callForm.AddParticipant(senderIP);
+                            // QUAN TRỌNG: Bắt đầu đẩy dữ liệu Cam cho người vừa chấp nhận
+                            _videoCallLogic.StartStreaming(senderIP, callForm.myMoniker);
+                        }
                         break;
 
                     case "Refuse":
@@ -251,16 +261,6 @@ namespace CLIENT.View
                 }
             }));
         }
-
-
-
-
-
-
-
-
-
-
 
 
 

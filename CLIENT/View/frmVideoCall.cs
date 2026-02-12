@@ -31,21 +31,15 @@ namespace CLIENT.View
 
             _videoCallLogic.OnFrameReceived += (senderIP, bmp) =>
             {
-                // Chạy trên luồng UI để đảm bảo an toàn khi cập nhật Control
                 this.BeginInvoke(new Action(() => {
-                    if (senderIP == "Me" || senderIP == _targetIP)
+                    // LUÔN KIỂM TRA: Nếu chưa có PictureBox cho IP này thì phải tạo mới
+                    if (!_participantVideos.ContainsKey(senderIP))
                     {
-                        UpdateFrame(senderIP, bmp);
+                        AddParticipant(senderIP);
                     }
-                    else
-                    {
-                        // Nếu là người tham gia mới (Group Call), thêm vào danh sách và scale lại
-                        if (!_participantVideos.ContainsKey(senderIP))
-                        {
-                            AddParticipant(senderIP);
-                        }
-                        UpdateFrame(senderIP, bmp);
-                    }
+
+                    // Cập nhật frame sau khi đã chắc chắn có PictureBox
+                    UpdateFrame(senderIP, bmp);
                 }));
             };
 
@@ -94,14 +88,10 @@ namespace CLIENT.View
             int count = _participantVideos.Count;
             if (count == 0) return;
 
-            // Tính toán số cột và hàng
             int cols = (count <= 1) ? 1 : (count <= 2) ? 2 : (int)Math.Ceiling(Math.Sqrt(count));
             int rows = (int)Math.Ceiling((double)count / cols);
 
-            // Tạm dừng vẽ để tránh hiện tượng nháy hình và tối ưu hiệu suất
             tableLayoutPanel1.SuspendLayout();
-
-            // Xóa sạch các thiết lập cũ
             tableLayoutPanel1.Controls.Clear();
             tableLayoutPanel1.ColumnStyles.Clear();
             tableLayoutPanel1.RowStyles.Clear();
@@ -109,29 +99,26 @@ namespace CLIENT.View
             tableLayoutPanel1.ColumnCount = cols;
             tableLayoutPanel1.RowCount = rows;
 
-            // Cấu hình tỷ lệ các cột (chia đều 100%)
-            float colWidth = 100f / cols;
+            // Thiết lập tỷ lệ phần trăm cho cột và hàng
             for (int i = 0; i < cols; i++)
-            {
-                tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, colWidth));
-            }
-
-            // Cấu hình tỷ lệ các hàng (chia đều 100%)
-            float rowHeight = 100f / rows;
+                tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / cols));
             for (int i = 0; i < rows; i++)
-            {
-                tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Percent, rowHeight));
-            }
+                tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / rows));
 
-            // Thêm lại các PictureBox và ép chúng lấp đầy ô (Dock = Fill)
+            // Quan trọng: Gán PictureBox vào đúng vị trí lưới
+            int current = 0;
             foreach (var pb in _participantVideos.Values)
             {
-                pb.Dock = DockStyle.Fill; // QUAN TRỌNG: Để ảnh tự scale theo ô lưới
-                pb.Margin = new Padding(2); // Khoảng cách nhỏ giữa các khung hình
-                tableLayoutPanel1.Controls.Add(pb);
+                pb.Dock = DockStyle.Fill;
+                pb.Margin = new Padding(2);
+                int r = current / cols;
+                int c = current % cols;
+                tableLayoutPanel1.Controls.Add(pb, c, r); // Thêm kèm vị trí cột, hàng
+                current++;
             }
 
             tableLayoutPanel1.ResumeLayout();
+            tableLayoutPanel1.Refresh(); // Buộc vẽ lại giao diện
         }
 
         //

@@ -22,24 +22,101 @@ namespace CLIENT.Process
         private Stream _ffmpegStream;
         private bool _isRecording = false;
 
+        // Sự kiện để báo cho UI biết có hình ảnh hoặc âm thanh mới
         public event Action<string, Bitmap> OnFrameReceived;
         public event Action<byte[]> OnAudioReceived;
 
         public VideoCallProcess(ClientSocketConnect client)
         {
             _client = client;
+
+            // QUAN TRỌNG: Đăng ký nhận dữ liệu từ Socket ngay khi khởi tạo
+            _client.OnRawDataReceived += Client_OnRawDataReceived;
         }
+
+        // --- XỬ LÝ NHẬN DỮ LIỆU TỪ SOCKET ---
+        private void Client_OnRawDataReceived(byte[] packetData)
+        {
+            try
+            {
+                // 1. Giải gói tin (Unpack)
+                var package = DataPackage.Unpack(packetData);
+
+                // 2. Chỉ xử lý nếu là gói tin VideoCall
+                if (package.Type == PackageType.VideoCall)
+                {
+                    // 3. Tách payload: TargetIP|Action|Base64Data
+                    string rawContent = Encoding.UTF8.GetString(package.Content);
+                    string[] parts = rawContent.Split('|');
+
+                    if (parts.Length >= 3)
+                    {
+                        // Protocol hiện tại: TargetIP|Action|Data
+                        // Người nhận sẽ không biết IP người gửi nếu server không gửi kèm.
+                        // Tạm thời gán là "Partner" để hiển thị.
+                        string senderIP = "Partner";
+                        string action = parts[1]; // "Frame" hoặc "Audio"
+                        string payload = parts[2]; // Dữ liệu mã hóa Base64
+
+                        // Gọi hàm xử lý chi tiết
+                        ProcessIncomingVideoData(senderIP, action, payload);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Lỗi Client_OnRawDataReceived: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Xử lý dữ liệu hình ảnh/âm thanh đã nhận và giải mã
+        /// </summary>
+        public void ProcessIncomingVideoData(string senderIP, string action, string rawPayload)
+        {
+            try
+            {
+                // 1. Giải mã Base64 -> Byte[] -> Decrypt AES
+                byte[] encryptedData = Convert.FromBase64String(rawPayload);
+                byte[] decryptedData = AES_Service.Decrypt(encryptedData, _client.AesKey);
+
+                if (action == "Frame")
+                {
+                    using (MemoryStream ms = new MemoryStream(decryptedData))
+                    {
+                        // Tạo Bitmap từ Stream
+                        using (Bitmap tempBmp = new Bitmap(ms))
+                        {
+                            // QUAN TRỌNG: Clone ra Bitmap mới để ngắt kết nối với MemoryStream 'ms'.
+                            // Nếu không có bước này, khi 'ms' bị Dispose, Bitmap sẽ bị lỗi GDI+.
+                            Bitmap safeFrame = new Bitmap(tempBmp);
+
+                            // Kích hoạt sự kiện vẽ lên Form
+                            OnFrameReceived?.Invoke(senderIP, safeFrame);
+                        }
+                    }
+                }
+                else if (action == "Audio")
+                {
+                    OnAudioReceived?.Invoke(decryptedData);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Lỗi xử lý video đến: " + ex.Message);
+            }
+        }
+
+        // --- CÁC CHỨC NĂNG GỬI ĐI ---
 
         /// <summary>
         /// Gửi tín hiệu điều khiển cuộc gọi (Invite, Ringing, Busy, End...)
         /// </summary>
-        // CLIENT/Process/VideoCallProcess.cs
-
         public void SendSignal(string target, string status)
         {
             try
             {
-                // Thêm "| " ở cuối để tránh lỗi IndexOutOfRangeException tại Server
+                // Thêm "| " ở cuối để đảm bảo split không lỗi
                 string signalData = $"{target}|{status}| ";
                 byte[] content = Encoding.UTF8.GetBytes(signalData);
                 _client.Send(new DataPackage(PackageType.VideoCall, content).Pack());
@@ -50,9 +127,6 @@ namespace CLIENT.Process
             }
         }
 
-        /// <summary>
-        /// Phương thức tương thích với các gọi cũ trong frmMain
-        /// </summary>
         public void SendVideoCallSignal(string target, string status) => SendSignal(target, status);
 
         /// <summary>
@@ -75,10 +149,9 @@ namespace CLIENT.Process
                         {
                             try
                             {
-                                // Lưu frame dưới dạng BMP vào luồng pipe của ffmpeg
                                 bmp.Save(_ffmpegStream, ImageFormat.Bmp);
                             }
-                            catch { /* Xử lý lỗi pipe nếu ffmpeg bị đóng đột ngột */ }
+                            catch { /* Xử lý lỗi pipe */ }
                         }
 
                         // Gửi frame qua mạng cho đối phương
@@ -100,15 +173,19 @@ namespace CLIENT.Process
         {
             try
             {
-                // Hiển thị frame lên màn hình của chính mình trước
+                // Hiển thị frame lên màn hình của chính mình trước (Self-View)
                 OnFrameReceived?.Invoke("Me", (Bitmap)bmp.Clone());
 
                 using (MemoryStream ms = new MemoryStream())
                 {
+                    // Nén ảnh sang JPEG để giảm dung lượng mạng
                     bmp.Save(ms, ImageFormat.Jpeg);
                     byte[] rawData = ms.ToArray();
+
+                    // Mã hóa AES
                     byte[] encryptedData = AES_Service.Encrypt(rawData, _client.AesKey);
 
+                    // Đóng gói: Target|Frame|Base64Data
                     string payload = $"{target}|Frame|{Convert.ToBase64String(encryptedData)}";
                     _client.Send(new DataPackage(PackageType.VideoCall, Encoding.UTF8.GetBytes(payload)).Pack());
                 }
@@ -120,12 +197,20 @@ namespace CLIENT.Process
         {
             try
             {
+                // Cấu hình mic: 16kHz, 16bit, Mono
                 _waveIn = new WaveInEvent { WaveFormat = new WaveFormat(16000, 16, 1) };
                 _waveIn.DataAvailable += (s, e) =>
                 {
-                    byte[] encryptedAudio = AES_Service.Encrypt(e.Buffer, _client.AesKey);
-                    string payload = $"{targetIP}|Audio|{Convert.ToBase64String(encryptedAudio)}";
-                    _client.Send(new DataPackage(PackageType.VideoCall, Encoding.UTF8.GetBytes(payload)).Pack());
+                    if (e.BytesRecorded > 0)
+                    {
+                        // Chỉ lấy đúng số byte thu được
+                        byte[] audioChunk = new byte[e.BytesRecorded];
+                        Array.Copy(e.Buffer, 0, audioChunk, 0, e.BytesRecorded);
+
+                        byte[] encryptedAudio = AES_Service.Encrypt(audioChunk, _client.AesKey);
+                        string payload = $"{targetIP}|Audio|{Convert.ToBase64String(encryptedAudio)}";
+                        _client.Send(new DataPackage(PackageType.VideoCall, Encoding.UTF8.GetBytes(payload)).Pack());
+                    }
                 };
                 _waveIn.StartRecording();
             }
@@ -151,7 +236,7 @@ namespace CLIENT.Process
                 _ffmpegProcess.StartInfo.Arguments = $"-f image2pipe -vcodec bmp -i - -c:v libx264 -preset ultrafast -pix_fmt yuv420p -y \"{outputPath}\"";
 
                 _ffmpegProcess.StartInfo.UseShellExecute = false;
-                _ffmpegProcess.StartInfo.RedirectStandardInput = true; //  Để đẩy dữ liệu bitmap vào
+                _ffmpegProcess.StartInfo.RedirectStandardInput = true;
                 _ffmpegProcess.StartInfo.CreateNoWindow = true;
 
                 _ffmpegProcess.Start();
@@ -171,6 +256,9 @@ namespace CLIENT.Process
         /// </summary>
         public void StopAll()
         {
+            // Hủy đăng ký sự kiện để tránh lỗi
+            _client.OnRawDataReceived -= Client_OnRawDataReceived;
+
             // 1. Dừng Camera
             if (_videoSource != null)
             {
@@ -208,42 +296,6 @@ namespace CLIENT.Process
                     _ffmpegProcess.Dispose();
                     _ffmpegProcess = null;
                 }
-            }
-        }
-
-
-
-
-
-
-        //
-        // Phương thức để xử lý dữ liệu thô nhận được từ Server (gọi từ frmMain)
-        //
-        public void ProcessIncomingVideoData(string senderIP, string action, string rawPayload)
-        {
-            try
-            {
-                // 1. Giải mã dữ liệu nhận được
-                byte[] encryptedData = Convert.FromBase64String(rawPayload);
-                byte[] decryptedData = AES_Service.Decrypt(encryptedData, _client.AesKey);
-
-                if (action == "Frame")
-                {
-                    using (MemoryStream ms = new MemoryStream(decryptedData))
-                    {
-                        Bitmap bmp = new Bitmap(ms);
-                        // 2. Kích hoạt sự kiện để báo cho Form vẽ hình
-                        OnFrameReceived?.Invoke(senderIP, bmp);
-                    }
-                }
-                else if (action == "Audio")
-                {
-                    OnAudioReceived?.Invoke(decryptedData);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("Lỗi xử lý video đến: " + ex.Message);
             }
         }
     }

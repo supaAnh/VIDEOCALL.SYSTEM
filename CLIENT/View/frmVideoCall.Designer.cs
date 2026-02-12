@@ -52,6 +52,7 @@
             tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
             tableLayoutPanel1.Size = new Size(1081, 607);
             tableLayoutPanel1.TabIndex = 0;
+
             // 
             // btnSelectionVideoCall
             // 

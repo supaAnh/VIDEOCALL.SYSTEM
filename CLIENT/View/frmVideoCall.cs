@@ -1,4 +1,5 @@
-﻿using NAudio.Wave;
+﻿using COMMON.DTO;
+using NAudio.Wave;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -33,10 +34,23 @@ namespace CLIENT.View
             // 1. Phải khởi tạo Audio Playback để tránh lỗi luồng
             InitAudioPlayback();
 
+            _videoCallLogic.OnAudioReceived += (audioData) =>
+            {
+                if (_waveProvider != null)
+                {
+                    try
+                    {
+                        _waveProvider.AddSamples(audioData, 0, audioData.Length);
+                    }
+                    catch { /* Bỏ qua nếu buffer đầy */ }
+                }
+            };
+
             _videoCallLogic.OnFrameReceived += (senderIP, bmp) =>
             {
                 if (this.IsDisposed) return;
-                this.BeginInvoke(new Action(() => {
+                this.BeginInvoke(new Action(() =>
+                {
                     // Nếu là người mới (không phải "Me" và chưa có trong danh sách)
                     if (!_participantVideos.ContainsKey(senderIP))
                     {
@@ -121,14 +135,73 @@ namespace CLIENT.View
         //
         // Cập nhật khung hình video cho người tham gia
         //
+
         public void UpdateFrame(string participantID, Bitmap frame)
         {
             if (_participantVideos.ContainsKey(participantID))
             {
-                var oldImg = _participantVideos[participantID].Image;
-                _participantVideos[participantID].Image = frame;
-                oldImg?.Dispose(); // Giải phóng bộ nhớ ảnh cũ
+                PictureBox pb = _participantVideos[participantID];
+                var oldImg = pb.Image;
+
+                pb.Image = frame; // Gán ảnh mới
+
+                // CỰC KỲ QUAN TRỌNG: Giải phóng ảnh cũ để tránh đầy RAM
+                if (oldImg != null)
+                {
+                    oldImg.Dispose();
+                }
             }
+            else
+            {
+                // Nếu người dùng không tồn tại (đã thoát), dispose frame mới nhận để tránh rác
+                frame?.Dispose();
+            }
+        }
+
+        // Xử lý khi nhận được Audio (Thêm mới)
+        public void OnAudioReceivedHandler(byte[] audioData)
+        {
+            if (_waveProvider != null)
+            {
+                try
+                {
+                    _waveProvider.AddSamples(audioData, 0, audioData.Length);
+                }
+                catch { /* Bỏ qua lỗi buffer đầy nếu cần */ }
+            }
+        }
+
+        private void InitAudioPlayback()
+        {
+            try
+            {
+                // Buffer 16kHz, 16bit, Mono
+                _waveProvider = new BufferedWaveProvider(new WaveFormat(16000, 16, 1));
+                _waveProvider.DiscardOnBufferOverflow = true; // Tránh crash khi mạng lag dồn gói tin
+
+                _waveOut = new WaveOutEvent();
+                _waveOut.Init(_waveProvider);
+                _waveOut.Play();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khởi tạo Audio: " + ex.Message);
+            }
+        }
+
+        private void OnFrameReceivedHandler(string senderIP, Bitmap bmp)
+        {
+            if (this.IsDisposed) return;
+
+            // Invoke an toàn
+            this.BeginInvoke(new Action(() =>
+            {
+                if (!_participantVideos.ContainsKey(senderIP))
+                {
+                    AddParticipant(senderIP);
+                }
+                UpdateFrame(senderIP, bmp);
+            }));
         }
 
         private void btnSelectionVideoCall_Click(object sender, EventArgs e)
@@ -141,24 +214,47 @@ namespace CLIENT.View
             ExitCall();
         }
 
-        private void ExitCall()
-        {
-            _videoCallLogic.SendSignal(_targetIP, "Leave"); // Gửi tín hiệu rời cuộc gọi
-            _videoCallLogic.StopAll(); // Dừng tất cả các tiến trình liên quan đến video call
-            this.Close(); // Đóng form
-        }
 
 
         //
         // AUDIO
         //
-        private void InitAudioPlayback()
+
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            // Cấu hình định dạng âm thanh khớp với phía gửi (16kHz, 16bit, Mono)
-            _waveProvider = new BufferedWaveProvider(new WaveFormat(16000, 16, 1));
-            _waveOut = new WaveOutEvent();
-            _waveOut.Init(_waveProvider);
-            _waveOut.Play();
+            CleanUpResources();
+            base.OnFormClosing(e);
+        }
+
+        private void ExitCall()
+        {
+            // Gửi tín hiệu rời đi
+            Task.Run(() => _videoCallLogic.SendSignal(_targetIP, "Leave"));
+            this.Close(); // Sẽ kích hoạt OnFormClosing
+        }
+
+        private void CleanUpResources()
+        {
+            // 1. Dừng Logic
+            _videoCallLogic.OnFrameReceived -= OnFrameReceivedHandler;
+            _videoCallLogic.StopAll();
+
+            // 2. Dừng Audio
+            if (_waveOut != null)
+            {
+                _waveOut.Stop();
+                _waveOut.Dispose();
+                _waveOut = null;
+            }
+
+            // 3. Giải phóng tất cả hình ảnh đang hiển thị
+            foreach (var pb in _participantVideos.Values)
+            {
+                if (pb.Image != null) pb.Image.Dispose();
+                pb.Dispose();
+            }
+            _participantVideos.Clear();
         }
 
     }

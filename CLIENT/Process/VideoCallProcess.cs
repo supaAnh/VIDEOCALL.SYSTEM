@@ -22,6 +22,9 @@ namespace CLIENT.Process
         private Stream _ffmpegStream;
         private bool _isRecording = false;
 
+        public event Action<string, Bitmap> OnFrameReceived;
+        public event Action<byte[]> OnAudioReceived;
+
         public VideoCallProcess(ClientSocketConnect client)
         {
             _client = client;
@@ -34,7 +37,8 @@ namespace CLIENT.Process
         {
             try
             {
-                string signalData = $"{target}|Signal|{status}";
+
+                string signalData = $"{target}|{status}";
                 byte[] content = Encoding.UTF8.GetBytes(signalData);
                 _client.Send(new DataPackage(PackageType.VideoCall, content).Pack());
             }
@@ -94,13 +98,13 @@ namespace CLIENT.Process
         {
             try
             {
+                // Hiển thị frame lên màn hình của chính mình trước
+                OnFrameReceived?.Invoke("Me", (Bitmap)bmp.Clone());
+
                 using (MemoryStream ms = new MemoryStream())
                 {
-                    // Nén ảnh sang JPEG để giảm băng thông truyền tải
                     bmp.Save(ms, ImageFormat.Jpeg);
                     byte[] rawData = ms.ToArray();
-
-                    // Mã hóa AES trước khi gửi để bảo mật cuộc gọi
                     byte[] encryptedData = AES_Service.Encrypt(rawData, _client.AesKey);
 
                     string payload = $"{target}|Frame|{Convert.ToBase64String(encryptedData)}";
@@ -202,6 +206,42 @@ namespace CLIENT.Process
                     _ffmpegProcess.Dispose();
                     _ffmpegProcess = null;
                 }
+            }
+        }
+
+
+
+
+
+
+        //
+        // Phương thức để xử lý dữ liệu thô nhận được từ Server (gọi từ frmMain)
+        //
+        public void ProcessIncomingVideoData(string senderIP, string action, string rawPayload)
+        {
+            try
+            {
+                // 1. Giải mã dữ liệu nhận được
+                byte[] encryptedData = Convert.FromBase64String(rawPayload);
+                byte[] decryptedData = AES_Service.Decrypt(encryptedData, _client.AesKey);
+
+                if (action == "Frame")
+                {
+                    using (MemoryStream ms = new MemoryStream(decryptedData))
+                    {
+                        Bitmap bmp = new Bitmap(ms);
+                        // 2. Kích hoạt sự kiện để báo cho Form vẽ hình
+                        OnFrameReceived?.Invoke(senderIP, bmp);
+                    }
+                }
+                else if (action == "Audio")
+                {
+                    OnAudioReceived?.Invoke(decryptedData);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Lỗi xử lý video đến: " + ex.Message);
             }
         }
     }

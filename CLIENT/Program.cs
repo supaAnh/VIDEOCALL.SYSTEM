@@ -11,6 +11,7 @@ namespace CLIENT
         {
             ApplicationConfiguration.Initialize();
 
+
             // Đường dẫn đến thư mục chứa ffmpeg binaries
             string ffmpegBinaryPath = @"D:\ffmpeg\bin";
 

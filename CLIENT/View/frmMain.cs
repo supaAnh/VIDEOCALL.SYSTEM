@@ -68,200 +68,205 @@ namespace CLIENT.View
 
         private void HandleIncomingData(byte[] data)
         {
-            //Giải mã dữ liệu nhận được từ server
+            // Giải mã gói tin thô nhận được từ server
             DataPackage package = DataPackage.Unpack(data);
 
-            //
-            // Danh sách người dùng đang online
-            //
-            if (package.Type == PackageType.UserStatusUpdate)
+            switch (package.Type)
             {
-                string listUser = Encoding.UTF8.GetString(package.Content);
-                string[] users = listUser.Split(',');
+                case PackageType.UserStatusUpdate:
+                    HandleUserStatusUpdate(package.Content);
+                    break;
 
-                this.Invoke(new Action(() =>
-                {
-                    lvOnlineUser.Items.Clear(); // Xóa sạch để cập nhật mới nhất
-                    foreach (string user in users)
-                    {
-                        if (!string.IsNullOrEmpty(user))
-                        {
-                            ListViewItem item = new ListViewItem(user);
-                            lvOnlineUser.Items.Add(item);
-                        }
-                    }
-                }));
+                case PackageType.GroupUpdate:
+                    HandleGroupUpdate(package.Content);
+                    break;
+
+                case PackageType.SendFile:
+                    HandleIncomingFile(package.Content);
+                    break;
+
+                case PackageType.GroupMessage:
+                    HandleGroupMessage(package.Content);
+                    break;
+
+                case PackageType.SecureMessage:
+                    HandleSecureMessage(package.Content);
+                    break;
+
+                case PackageType.VideoCall:
+                    HandleVideoCall(package.Content);
+                    break;
+
+                case PackageType.DH_KeyExchange:
+                    this.aesKey = package.Content; // Lưu khóa AES dùng chung
+                    this.Invoke(new Action(() => MessageBox.Show("Đã thiết lập kết nối bảo mật thành công!")));
+                    break;
+
+                default:
+                    // Xử lý các gói tin không xác định nếu cần
+                    break;
             }
+        }
 
-            //
-            // Cập nhật nhóm mới
-            //
-            else if (package.Type == PackageType.GroupUpdate)
+        // --- Tách các hàm xử lý con để code sạch sẽ hơn ---
+
+        private void HandleUserStatusUpdate(byte[] content)
+        {
+            string listUser = Encoding.UTF8.GetString(content);
+            string[] users = listUser.Split(',');
+
+            this.Invoke(new Action(() =>
             {
-                string groupName = Encoding.UTF8.GetString(package.Content);
-                this.Invoke(new Action(() =>
+                lvOnlineUser.Items.Clear();
+                foreach (string user in users)
                 {
-                    ListViewItem groupItem = new ListViewItem(groupName);
-                    groupItem.ForeColor = Color.Blue; // Đổi màu xanh để nhận diện là Nhóm
-                    groupItem.Font = new Font(lvOnlineUser.Font, FontStyle.Bold);
-                    groupItem.Tag = "GROUP"; // Đánh dấu loại để xử lý logic gửi tin sau này
-                    lvOnlineUser.Items.Add(groupItem);
-                }));
-            }
-
-            //
-            // Gửi file
-            //
-            else if (package.Type == PackageType.SendFile)
-            {
-                this.Invoke(new Action(() =>
-                {
-                    // Gọi hàm xử lý và nhận tên file trả về
-                    string fileName = _fileProcess.ProcessIncomingFile(package.Content);
-
-                    if (!string.IsNullOrEmpty(fileName))
+                    if (!string.IsNullOrEmpty(user))
                     {
-                        // Hiển thị thông báo lên khung chat
-                        txtChatBox.AppendText($"[Hệ thống]: Đã nhận file thành công: {fileName}{Environment.NewLine}");
-                        MessageBox.Show($"Bạn đã nhận được file: {fileName}", "Thông báo");
+                        lvOnlineUser.Items.Add(new ListViewItem(user));
                     }
+                }
+            }));
+        }
+
+        private void HandleGroupUpdate(byte[] content)
+        {
+            string groupName = Encoding.UTF8.GetString(content);
+            this.Invoke(new Action(() =>
+            {
+                ListViewItem groupItem = new ListViewItem(groupName);
+                groupItem.ForeColor = Color.Blue;
+                groupItem.Font = new Font(lvOnlineUser.Font, FontStyle.Bold);
+                groupItem.Tag = "GROUP";
+                lvOnlineUser.Items.Add(groupItem);
+            }));
+        }
+
+        private void HandleIncomingFile(byte[] content)
+        {
+            this.Invoke(new Action(() =>
+            {
+                string fileName = _fileProcess.ProcessIncomingFile(content);
+                if (!string.IsNullOrEmpty(fileName))
+                {
+                    txtChatBox.AppendText($"[Hệ thống]: Nhận file thành công: {fileName}{Environment.NewLine}");
+                    MessageBox.Show($"Bạn đã nhận được file: {fileName}");
+                }
+            }));
+        }
+
+        private void HandleGroupMessage(byte[] content)
+        {
+            try
+            {
+                string decrypted = AES_Service.DecryptString(content, _client.AesKey);
+                string[] parts = decrypted.Split('|');
+                string gName = parts[0], sIP = parts[1], msg = parts[2];
+
+                this.Invoke(new Action(() =>
+                {
+                    if (_selectedTargetIP == gName)
+                        txtChatBox.AppendText($"[{sIP}]: {msg}{Environment.NewLine}");
                     else
-                    {
-                        txtChatBox.AppendText($"[Hệ thống]: Nhận file thất bại (Lỗi giải mã).{Environment.NewLine}");
-                    }
+                        MessageBox.Show($"Tin nhắn mới từ nhóm {gName}");
                 }));
             }
-            //
-            // Tin nhắn nhóm
-            //
-            else if (package.Type == PackageType.GroupMessage)
+            catch (Exception ex) { MessageBox.Show("Lỗi giải mã tin nhắn nhóm: " + ex.Message); }
+        }
+
+        private void HandleSecureMessage(byte[] content)
+        {
+            try
             {
-                try
+                string decrypted = AES_Service.DecryptString(content, _client.AesKey);
+                if (decrypted.Contains("|"))
                 {
-                    string decrypted = AES_Service.DecryptString(package.Content, _client.AesKey);
                     string[] parts = decrypted.Split('|');
-                    string groupName = parts[0];
-                    string senderIP = parts[1];
-                    string content = parts[2];
+                    string sIP = parts[0], msg = parts[1];
 
                     this.Invoke(new Action(() =>
                     {
-                        // Hiển thị nếu đang mở đúng cửa sổ chat của nhóm đó
-                        if (_selectedTargetIP == groupName)
+                        if (sIP == _selectedTargetIP)
+                            txtChatBox.AppendText($"[{sIP}]: {msg}{Environment.NewLine}");
+                        else
+                            MessageBox.Show($"Tin nhắn mới từ [{sIP}]: {msg}");
+                    }));
+                }
+            }
+            catch (Exception ex) { MessageBox.Show("Lỗi hiển thị chat: " + ex.Message); }
+        }
+
+        private void HandleVideoCall(byte[] content)
+        {
+            string rawSignal = Encoding.UTF8.GetString(content);
+            string[] parts = rawSignal.Split('|');
+
+            // Tín hiệu tối thiểu phải có 2 phần: [SenderIP] và [Status]
+            if (parts.Length < 2) return;
+
+            string senderIP = parts[0];
+            string status = parts[1];
+            // Payload chỉ có khi status là Frame hoặc Audio
+            string payload = parts.Length >= 3 ? parts[2] : "";
+
+            this.Invoke(new Action(() =>
+            {
+                switch (status)
+                {
+                    case "Request":
+                        // Hiển thị thông báo khi có người gọi đến
+                        var res = MessageBox.Show($"Cuộc gọi video từ {senderIP}. Đồng ý?",
+                                  "Video Call", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                        if (res == DialogResult.Yes)
                         {
-                            txtChatBox.AppendText($"[{senderIP}]: {content}{Environment.NewLine}");
+                            using (frmSelectOption sd = new frmSelectOption())
+                            {
+                                if (sd.ShowDialog() == DialogResult.OK)
+                                {
+                                    _videoCallLogic.SendVideoCallSignal(senderIP, "Accept");
+                                    frmVideoCall callForm = new frmVideoCall(senderIP, sd.SelectedMoniker, _videoCallLogic);
+                                    callForm.Show();
+                                }
+                                else
+                                {
+                                    _videoCallLogic.SendVideoCallSignal(senderIP, "Refuse");
+                                }
+                            }
                         }
                         else
                         {
-                            // Thông báo tin nhắn mới từ nhóm khác
-                            MessageBox.Show($"Tin nhắn mới từ nhóm {groupName}");
+                            _videoCallLogic.SendVideoCallSignal(senderIP, "Refuse");
                         }
-                    }));
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Lỗi giải mã tin nhắn nhóm: " + ex.Message);
-                }
-            }
+                        break;
 
-            //
-            // Tin nhắn bảo mật từ người khác
-            //
-            else if (package.Type == PackageType.SecureMessage)
-            {
-                try
-                {
-                    string decrypted = AES_Service.DecryptString(package.Content, _client.AesKey);
-
-                    if (decrypted.Contains("|"))
-                    {
-                        string[] parts = decrypted.Split('|');
-                        string incomingSenderIP = parts[0];
-                        string content = parts[1];
-
-                        this.Invoke(new Action(() =>
+                    case "Frame":
+                    case "Audio":
+                        if (!string.IsNullOrEmpty(payload))
                         {
-                            // Chỉ hiển thị nếu người gửi chính là người mình đang chọn chat
-                            if (incomingSenderIP == _selectedTargetIP)
-                            {
-                                txtChatBox.AppendText($"[{incomingSenderIP}]: {content}{Environment.NewLine}");
-                            }
-                            else
-                            {
-                                MessageBox.Show($"Tin nhắn mới từ [{incomingSenderIP}]: {content}", "Tin nhắn mới");
-                            }
-                        }));
-                    }
+                            _videoCallLogic.ProcessIncomingVideoData(senderIP, status, payload);
+                        }
+                        break;
+
+                    case "Accept":
+                        MessageBox.Show($"[{senderIP}] đã chấp nhận cuộc gọi.");
+                        break;
+
+                    case "Refuse":
+                        MessageBox.Show($"[{senderIP}] từ chối cuộc gọi.");
+                        break;
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Lỗi hiển thị chat: " + ex.Message);
-                }
-            }
-
-            //
-            // Cuộc gọi video
-            //
-            else if (package.Type == PackageType.VideoCall)
-            {
-                string rawSignal = Encoding.UTF8.GetString(package.Content);
-                string[] parts = rawSignal.Split('|');
-                string senderIP = parts[0];
-                string status = parts[1];
-
-                this.Invoke(new Action(() => {
-                    switch (status)
-                    {
-                        case "Request":
-                            var res = MessageBox.Show($"Cuộc gọi từ {senderIP}. Đồng ý?", "Video Call", MessageBoxButtons.YesNo);
-                            if (res == DialogResult.Yes)
-                            {
-                                // 1. Sửa tên Form từ frmDeviceSelection thành frmSelectOption
-                                using (frmSelectOption sd = new frmSelectOption())
-                                {
-                                    if (sd.ShowDialog() == DialogResult.OK)
-                                    {
-                                        _videoCallLogic.SendVideoCallSignal(senderIP, "Accept");
-
-                                        // 2. Sửa lỗi biến 'selectDevice' không tồn tại thành 'sd' (tên biến instance bạn vừa tạo)
-                                        // 3. Sử dụng 'senderIP' thay vì '_selectedTargetIP' vì đây là người đang gọi đến bạn
-                                        frmVideoCall callForm = new frmVideoCall(senderIP, sd.SelectedMoniker, _videoCallLogic);
-                                        callForm.Show();
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                _videoCallLogic.SendVideoCallSignal(senderIP, "Refuse");
-                            }
-                            break;
-
-                        case "Accept":
-                            // Logic khi đối phương đồng ý: Bạn cần mở Form Video Call tại đây
-                            // Lưu ý: Cần lấy được Moniker mà bạn đã chọn từ lúc gửi Request
-                            MessageBox.Show("Đối phương đã chấp nhận cuộc gọi.");
-                            break;
-
-                        case "Refuse":
-                            MessageBox.Show("Đối phương đã từ chối cuộc gọi.");
-                            // Thêm logic để tìm và đóng frmVideoCall đang ở trạng thái chờ (Ringing) nếu có
-                            break;
-                    }
-                }));
-            }
-
-            //
-            // Thiết lập kết nối bảo mật (nhận khóa DH từ server)
-            //
-            else if (package.Type == PackageType.DH_KeyExchange)
-            {
-                this.aesKey = package.Content; // Lưu khóa này lại để dùng cho AES_Service
-                this.Invoke(new Action(() =>
-                {
-                    MessageBox.Show("Đã thiết lập kết nối bảo mật thành công!");
-                }));
-            }
+            }));
         }
+
+
+
+
+
+
+
+
+
+
 
 
 

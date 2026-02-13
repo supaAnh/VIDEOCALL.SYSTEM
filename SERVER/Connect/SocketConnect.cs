@@ -15,6 +15,10 @@ public class SocketConnect
     IPEndPoint IP;
     Socket server;
 
+    // Lưu trữ ánh xạ giữa Socket và tên người dùng
+    private Dictionary<Socket, string> _socketToUser = new Dictionary<Socket, string>();
+
+
     // Lưu trữ khóa AES cho từng Client
     private Dictionary<Socket, byte[]> clientKeys = new Dictionary<Socket, byte[]>();
 
@@ -199,9 +203,14 @@ public class SocketConnect
     //Hàm nhận data từ client
     //
     // Hàm xử lý logic tập trung cho từng gói tin sau khi đã được tách đúng
+    // Sửa lại hàm HandlePackage trong SERVER/Connect/SocketConnect.cs
+
     private void HandlePackage(Socket senderSocket, DataPackage package)
     {
         string senderIP = senderSocket.RemoteEndPoint.ToString();
+
+        // Lấy định danh: Nếu đã đăng nhập thì lấy Username, chưa thì lấy IP
+        string senderIdentity = _socketToUser.ContainsKey(senderSocket) ? _socketToUser[senderSocket] : senderIP;
 
         switch (package.Type)
         {
@@ -210,34 +219,117 @@ public class SocketConnect
                 BroadcastOnlineList();
                 break;
 
+            // --- XỬ LÝ ĐĂNG KÝ (MỚI) ---
+            case PackageType.Register:
+                if (clientKeys.TryGetValue(senderSocket, out byte[] regKey))
+                {
+                    // Đổi tên biến để tránh trùng: regData, regParts, regMsg
+                    string regData = COMMON.Security.AES_Service.DecryptString(package.Content, regKey);
+                    string[] regParts = regData.Split('|'); // username|password
+                    if (regParts.Length >= 2)
+                    {
+                        bool success = db.RegisterUser(regParts[0], regParts[1]);
+                        string regMsg = success ? "OK" : "FAIL";
+                        byte[] response = COMMON.Security.AES_Service.EncryptString(regMsg, regKey);
+                        senderSocket.Send(new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.Register, response).Pack());
+                        SERVER.LogUI.LogViewUI.AddLog($"[{senderIP}] đăng ký tài khoản [{regParts[0]}]: {regMsg}");
+                    }
+                }
+                break;
+
+            // --- XỬ LÝ ĐĂNG NHẬP (MỚI) ---
+            case PackageType.Authenticate:
+                if (clientKeys.TryGetValue(senderSocket, out byte[] authKey))
+                {
+                    string authData = COMMON.Security.AES_Service.DecryptString(package.Content, authKey);
+                    string[] authParts = authData.Split('|'); // username|password
+                    if (authParts.Length >= 2)
+                    {
+                        string uName = authParts[0];
+                        string pass = authParts[1];
+
+                        // 1. Kiểm tra tài khoản có đang online không
+                        bool isAlreadyLoggedIn = false;
+                        lock (_socketToUser)
+                        {
+                            if (_socketToUser.ContainsValue(uName)) isAlreadyLoggedIn = true;
+                        }
+
+                        if (isAlreadyLoggedIn)
+                        {
+                            // Nếu trùng -> Từ chối
+                            byte[] resDuplicate = COMMON.Security.AES_Service.EncryptString("DUPLICATE", authKey);
+                            senderSocket.Send(new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.LoginResponse, resDuplicate).Pack());
+                            SERVER.LogUI.LogViewUI.AddLog($"[{senderIP}] bị từ chối: Tài khoản [{uName}] đang online.");
+                        }
+                        else
+                        {
+                            // 2. Kiểm tra Database
+                            if (db.CheckLogin(uName, pass))
+                            {
+                                lock (_socketToUser)
+                                {
+                                    _socketToUser[senderSocket] = uName;
+                                }
+
+                                SERVER.LogUI.LogViewUI.AddLog($"[{senderIP}] đăng nhập thành công [{uName}]");
+
+                                // --- CẬP NHẬT GIAO DIỆN SERVER (QUAN TRỌNG) ---
+                                // Bước A: Xóa dòng chỉ có IP (được thêm lúc mới kết nối Socket)
+                                SERVER.LogUI.LogViewUI.RemoveClient(senderIP);
+
+                                // Bước B: Thêm dòng mới định dạng "IP - Username"
+                                string displayIdentity = $"{senderIP} - {uName}";
+                                SERVER.LogUI.LogViewUI.AddClient(displayIdentity);
+
+                                // Trả về OK cho Client
+                                byte[] resOK = COMMON.Security.AES_Service.EncryptString("OK", authKey);
+                                senderSocket.Send(new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.LoginResponse, resOK).Pack());
+
+                                // Cập nhật danh sách online cho mọi người
+                                BroadcastOnlineList();
+                            }
+                            else
+                            {
+                                byte[] resFail = COMMON.Security.AES_Service.EncryptString("FAIL", authKey);
+                                senderSocket.Send(new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.LoginResponse, resFail).Pack());
+                                SERVER.LogUI.LogViewUI.AddLog($"[{senderIP}] đăng nhập thất bại (Sai mật khẩu)");
+                            }
+                        }
+                    }
+                }
+                break;
+
             // 2. Tin nhắn bảo mật (Chat riêng)
             case PackageType.SecureMessage:
                 if (clientKeys.TryGetValue(senderSocket, out byte[] senderKey))
                 {
                     try
                     {
-                        string decrypted = AES_Service.DecryptString(package.Content, senderKey);
+                        string decrypted = COMMON.Security.AES_Service.DecryptString(package.Content, senderKey);
                         if (decrypted.Contains("|"))
                         {
                             string[] parts = decrypted.Split('|');
-                            string targetIP = parts[0];
+                            string targetUser = parts[0]; // Bây giờ là Username đích
                             string messageContent = parts[1];
 
-                            LogViewUI.AddLog($"Chat: [{senderIP}] -> [{targetIP}]: {messageContent}");
-                            db.SaveChatMessage(senderIP, targetIP, messageContent);
+                            SERVER.LogUI.LogViewUI.AddLog($"Chat: [{senderIdentity}] -> [{targetUser}]: {messageContent}");
 
-                            ForwardToClient(targetIP, senderIP, messageContent, PackageType.SecureMessage);
+                            // Lưu DB (cần sửa logic DB nếu muốn lưu Username thay vì IP, tạm thời giữ nguyên tham số)
+                            db.SaveChatMessage(senderIdentity, targetUser, messageContent);
+
+                            ForwardToClient(targetUser, senderIdentity, messageContent, COMMON.DTO.PackageType.SecureMessage);
                         }
                     }
-                    catch (Exception ex) { LogViewUI.AddLog($"!!! Lỗi SecureMessage: {ex.Message}"); }
+                    catch (Exception ex) { SERVER.LogUI.LogViewUI.AddLog($"!!! Lỗi SecureMessage: {ex.Message}"); }
                 }
                 break;
 
-            // 3. Tin nhắn thường (Không mã hóa)
+            // 3. Tin nhắn thường
             case PackageType.ChatMessage:
+                // Biến msg ở đây là nguyên nhân gây lỗi cho các case khác nếu không đổi tên
                 string msg = Encoding.UTF8.GetString(package.Content);
-                LogViewUI.AddLog($"Tin nhắn thường từ [{senderIP}]: {msg}");
-
+                SERVER.LogUI.LogViewUI.AddLog($"Tin nhắn thường từ [{senderIdentity}]: {msg}");
                 lock (clientKeys)
                 {
                     foreach (Socket client in clientKeys.Keys)
@@ -257,15 +349,15 @@ public class SocketConnect
                 string newGroupName = gParts[0];
                 List<string> members = gParts[1].Split(',').ToList();
 
-                if (!members.Contains(senderIP)) members.Add(senderIP);
+                if (!members.Contains(senderIdentity)) members.Add(senderIdentity);
 
                 lock (groupMembersTable)
                 {
                     groupMembersTable[newGroupName] = members;
                 }
 
-                // Thông báo cho tất cả thành viên trong nhóm
-                DataPackage gUpdate = new DataPackage(PackageType.GroupUpdate, Encoding.UTF8.GetBytes(newGroupName));
+                // Thông báo cho tất cả thành viên (dựa trên Username)
+                COMMON.DTO.DataPackage gUpdate = new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.GroupUpdate, Encoding.UTF8.GetBytes(newGroupName));
                 BroadcastToList(members, gUpdate.Pack());
                 break;
 
@@ -275,24 +367,25 @@ public class SocketConnect
                 {
                     try
                     {
-                        string dec = AES_Service.DecryptString(package.Content, sKey);
+                        string dec = COMMON.Security.AES_Service.DecryptString(package.Content, sKey);
                         string[] p = dec.Split('|');
                         if (p.Length < 2) return;
 
                         string gName = p[0];
                         string gContent = p[1];
 
-                        LogViewUI.AddLog($"Group [{gName}]: {senderIP} -> {gContent}");
-                        db.SaveGroupMessage(senderIP, gName, gContent);
+                        SERVER.LogUI.LogViewUI.AddLog($"Group [{gName}]: {senderIdentity} -> {gContent}");
+                        db.SaveGroupMessage(senderIdentity, gName, gContent);
 
                         if (groupMembersTable.ContainsKey(gName))
                         {
                             List<string> gMembers = groupMembersTable[gName];
-                            string forwardData = $"{gName}|{senderIP}|{gContent}";
+                            // Gửi kèm senderIdentity (Username)
+                            string forwardData = $"{gName}|{senderIdentity}|{gContent}";
                             BroadcastToGroup(gMembers, forwardData, senderSocket);
                         }
                     }
-                    catch (Exception ex) { LogViewUI.AddLog($"!!! Lỗi GroupMsg: {ex.Message}"); }
+                    catch (Exception ex) { SERVER.LogUI.LogViewUI.AddLog($"!!! Lỗi GroupMsg: {ex.Message}"); }
                 }
                 break;
 
@@ -306,25 +399,24 @@ public class SocketConnect
                 string target = Encoding.UTF8.GetString(package.Content);
                 List<string> logs = groupMembersTable.ContainsKey(target)
                                     ? db.GetGroupChatHistory(target)
-                                    : db.GetChatHistory(senderIP, target);
+                                    : db.GetChatHistory(senderIdentity, target);
 
                 foreach (string line in logs)
                 {
                     if (clientKeys.TryGetValue(senderSocket, out byte[] k))
                     {
-                        byte[] enc = AES_Service.EncryptString(line, k);
-                        PackageType type = groupMembersTable.ContainsKey(target) ? PackageType.GroupMessage : PackageType.SecureMessage;
-                        senderSocket.Send(new DataPackage(type, enc).Pack());
+                        byte[] enc = COMMON.Security.AES_Service.EncryptString(line, k);
+                        COMMON.DTO.PackageType type = groupMembersTable.ContainsKey(target) ? COMMON.DTO.PackageType.GroupMessage : COMMON.DTO.PackageType.SecureMessage;
+                        senderSocket.Send(new COMMON.DTO.DataPackage(type, enc).Pack());
                     }
                 }
                 break;
 
-            //    
             // 8. Tín hiệu Video Call
-            //
             case PackageType.VideoCall:
                 {
                     string vData = Encoding.UTF8.GetString(package.Content);
+                    // Payload: [TargetUser]|[Action]|[Data]
                     if (!vData.Contains("|")) break;
 
                     string[] vParts = vData.Split('|');
@@ -332,118 +424,36 @@ public class SocketConnect
                     string vAction = vParts[1];
                     string vRawPayload = vParts.Length >= 3 ? vParts[2] : "";
 
-                    // 1. Kiểm tra xem vTarget có phải là Group không?
-                    // Sử dụng lock để an toàn khi đọc/ghi danh sách thành viên
-                    List<string> targetGroupMembers = null;
-                    bool isGroup = false;
-
-                    lock (groupMembersTable)
-                    {
-                        if (groupMembersTable.ContainsKey(vTarget))
-                        {
-                            isGroup = true;
-                            targetGroupMembers = groupMembersTable[vTarget];
-
-                            //  Nếu người gửi (senderIP) chưa có trong nhóm -> Tự động thêm vào.
-                            // Điều này giúp Client vào sau (Port mới) vẫn được tính là thành viên và nhận được Video từ người khác.
-                            if (!targetGroupMembers.Contains(senderIP))
-                            {
-                                targetGroupMembers.Add(senderIP);
-                                LogViewUI.AddLog($"Video: Đã thêm {senderIP} vào nhóm {vTarget}");
-                            }
-                        }
-                    }
-
-                    if (isGroup && targetGroupMembers != null)
-                    {
-                        // --- XỬ LÝ CHO GROUP ---
-
-                        lock (clientKeys)
-                        {
-                            foreach (var item in clientKeys)
-                            {
-                                string clientIP = item.Key.RemoteEndPoint.ToString();
-
-                                // Kiểm tra Client đích có trong danh sách nhóm không
-                                if (targetGroupMembers.Contains(clientIP) && clientIP != senderIP && item.Key.Connected)
-                                {
-                                    try
-                                    {
-                                        string finalPayload = vRawPayload;
-
-                                        // Re-Encrypt Frame/Audio
-                                        if ((vAction == "Frame" || vAction == "Audio") && !string.IsNullOrEmpty(vRawPayload) && clientKeys.TryGetValue(senderSocket, out byte[] vSenderKey))
-                                        {
-                                            byte[] originalData = AES_Service.Decrypt(Convert.FromBase64String(vRawPayload), vSenderKey);
-                                            byte[] reEncrypted = AES_Service.Encrypt(originalData, item.Value);
-                                            finalPayload = Convert.ToBase64String(reEncrypted);
-                                        }
-
-                                        string senderIdentity = (vAction == "Request") ? vTarget : senderIP;
-                                        string groupForwardData = $"{senderIdentity}|{vAction}|{finalPayload}";
-
-                                        byte[] pkg = Encoding.UTF8.GetBytes(groupForwardData);
-                                        item.Key.Send(new DataPackage(PackageType.VideoCall, pkg).Pack());
-                                    }
-                                    catch (Exception ex) { LogViewUI.AddLog($"Lỗi Forward Group Video: {ex.Message}"); }
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // --- XỬ LÝ CHO CÁ NHÂN (1-1) --- (GIỮ NGUYÊN)
-                        lock (clientKeys)
-                        {
-                            foreach (var item in clientKeys)
-                            {
-                                if (item.Key.RemoteEndPoint.ToString() == vTarget && item.Key.Connected)
-                                {
-                                    try
-                                    {
-                                        string finalPayload = vRawPayload;
-                                        if ((vAction == "Frame" || vAction == "Audio") && !string.IsNullOrEmpty(vRawPayload) && clientKeys.TryGetValue(senderSocket, out byte[] vSenderKey))
-                                        {
-                                            byte[] originalData = AES_Service.Decrypt(Convert.FromBase64String(vRawPayload), vSenderKey);
-                                            byte[] reEncrypted = AES_Service.Encrypt(originalData, item.Value);
-                                            finalPayload = Convert.ToBase64String(reEncrypted);
-                                        }
-
-                                        string p2pData = $"{senderIP}|{vAction}|{finalPayload}";
-                                        item.Key.Send(new DataPackage(PackageType.VideoCall, Encoding.UTF8.GetBytes(p2pData)).Pack());
-                                    }
-                                    catch (Exception ex) { LogViewUI.AddLog($"Lỗi Forward P2P Video: {ex.Message}"); }
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                    // Logic Video Call giữ nguyên nhưng ForwardToClient sẽ xử lý map username
+                    ForwardToClient(vTarget, senderIdentity, $"{vAction}|{vRawPayload}", COMMON.DTO.PackageType.VideoCall);
                 }
                 break;
-
-
         }
     }
 
-
     // Gửi trực tiếp đến một client dựa trên IP
 
-    private void ForwardToClient(string targetIP, string senderIP, string content, PackageType type)
+    private void ForwardToClient(string targetUsername, string senderUsername, string content, PackageType type)
     {
-        lock (clientKeys)
+        lock (_socketToUser)
         {
-            foreach (var item in clientKeys)
+            // Tìm socket có Username trùng với targetUsername
+            foreach (var pair in _socketToUser)
             {
-                if (item.Key.RemoteEndPoint.ToString() == targetIP && item.Key.Connected)
+                if (pair.Value == targetUsername && pair.Key.Connected)
                 {
-                    // tin nhắn bảo mật hoặc Video Call cần đính kèm IP người gửi
-                    string dataToSend = (type == PackageType.SecureMessage || type == PackageType.VideoCall)
-                                        ? $"{senderIP}|{content}"
-                                        : content;
+                    // Tìm thấy socket đích, lấy Key mã hóa của họ
+                    if (clientKeys.TryGetValue(pair.Key, out byte[] targetKey))
+                    {
+                        // Đóng gói: SenderUsername | Content
+                        string dataToSend = (type == PackageType.SecureMessage || type == PackageType.VideoCall)
+                                            ? $"{senderUsername}|{content}"
+                                            : content;
 
-                    byte[] enc = AES_Service.EncryptString(dataToSend, item.Value);
-                    item.Key.Send(new DataPackage(type, enc).Pack());
-                    return;
+                        byte[] enc = AES_Service.EncryptString(dataToSend, targetKey);
+                        pair.Key.Send(new DataPackage(type, enc).Pack());
+                    }
+                    return; // Đã gửi xong thì thoát
                 }
             }
         }
@@ -451,15 +461,16 @@ public class SocketConnect
 
 
     // Gửi cho danh sách IP cụ thể
-    private void BroadcastToList(List<string> ips, byte[] data)
+    private void BroadcastToList(List<string> usernames, byte[] data)
     {
-        lock (clientKeys)
+        lock (_socketToUser)
         {
-            foreach (var client in clientKeys.Keys)
+            foreach (var pair in _socketToUser)
             {
-                if (ips.Contains(client.RemoteEndPoint.ToString()) && client.Connected)
+                // Kiểm tra nếu Username nằm trong danh sách nhận
+                if (usernames.Contains(pair.Value) && pair.Key.Connected)
                 {
-                    client.Send(data);
+                    pair.Key.Send(data);
                 }
             }
         }
@@ -484,16 +495,41 @@ public class SocketConnect
     // hàm xử lý ngắt kết nối 
     private void HandleDisconnect(Socket client)
     {
-        lock (clientKeys)
+        // Lấy IP trước khi đóng socket (dùng try-catch để an toàn)
+        string clientIP = "Unknown";
+        try { clientIP = client.RemoteEndPoint?.ToString(); } catch { }
+
+        // Mặc định chuỗi cần xóa là IP (nếu chưa đăng nhập)
+        string identityToRemove = clientIP;
+
+        lock (_socketToUser)
         {
-            if (clientKeys.ContainsKey(client))
+            if (_socketToUser.ContainsKey(client))
             {
-                clientKeys.Remove(client);
+                string uName = _socketToUser[client];
+
+                // Nếu đã đăng nhập, chuỗi trên UI là "IP - Username", ta phải xóa đúng chuỗi này
+                identityToRemove = $"{clientIP} - {uName}";
+
+                _socketToUser.Remove(client);
             }
         }
-        string ip = client.RemoteEndPoint?.ToString() ?? "Unknown";
-        client.Close();
-        LogViewUI.RemoveClient(ip);
+
+        lock (clientKeys)
+        {
+            if (clientKeys.ContainsKey(client)) clientKeys.Remove(client);
+        }
+
+        try { client.Close(); } catch { }
+
+        // Xóa khỏi giao diện Server
+        if (!string.IsNullOrEmpty(identityToRemove))
+        {
+            SERVER.LogUI.LogViewUI.RemoveClient(identityToRemove);
+            SERVER.LogUI.LogViewUI.AddLog($"Client [{identityToRemove}] đã ngắt kết nối.");
+        }
+
+        // Cập nhật danh sách mới cho các client còn lại
         BroadcastOnlineList();
     }
 
@@ -502,28 +538,23 @@ public class SocketConnect
     //
     private void BroadcastOnlineList()
     {
-        lock (clientKeys)
+        lock (_socketToUser)
         {
-            // 1. Lấy danh sách tất cả các IP đang kết nối
-            List<string> allOnlineUsers = new List<string>();
-            foreach (var s in clientKeys.Keys)
-            {
-                if (s != null && s.Connected)
-                {
-                    allOnlineUsers.Add(s.RemoteEndPoint.ToString());
-                }
-            }
+            // 1. Lấy danh sách tất cả các Username đang kết nối
+            List<string> allOnlineUsers = _socketToUser.Values.ToList();
 
-            // 2. Gửi danh sách đã lọc cho từng Client cụ thể
-            foreach (var client in clientKeys.Keys)
+            // 2. Gửi danh sách cho từng Client
+            foreach (var pair in _socketToUser)
             {
+                Socket client = pair.Key;
+                string myName = pair.Value;
+
                 if (client != null && client.Connected)
                 {
                     try
                     {
-                        string myIP = client.RemoteEndPoint.ToString();
-                        // Lọc bỏ IP của chính Client này khỏi danh sách gửi cho họ
-                        var filteredList = allOnlineUsers.Where(ip => ip != myIP).ToList();
+                        // Lọc bỏ tên của chính mình
+                        var filteredList = allOnlineUsers.Where(u => u != myName).ToList();
 
                         string listString = string.Join(",", filteredList);
                         byte[] content = Encoding.UTF8.GetBytes(listString);
@@ -536,5 +567,9 @@ public class SocketConnect
             }
         }
     }
+
+
+
+
 
 }

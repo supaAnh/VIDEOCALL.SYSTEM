@@ -114,7 +114,7 @@
             listViewClientConnected.Columns.AddRange(new ColumnHeader[] { columnHeader3 });
             listViewClientConnected.Location = new Point(206, 12);
             listViewClientConnected.Name = "listViewClientConnected";
-            listViewClientConnected.Size = new Size(340, 175);
+            listViewClientConnected.Size = new Size(355, 175);
             listViewClientConnected.TabIndex = 6;
             listViewClientConnected.UseCompatibleStateImageBehavior = false;
             listViewClientConnected.View = View.Details;

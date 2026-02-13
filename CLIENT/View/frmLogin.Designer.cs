@@ -36,13 +36,14 @@
             txtPassword = new TextBox();
             checkBox1 = new CheckBox();
             lbStatus = new Label();
+            btnRegister = new Button();
             SuspendLayout();
             // 
             // btnLogin
             // 
-            btnLogin.Location = new Point(159, 183);
+            btnLogin.Location = new Point(88, 172);
             btnLogin.Name = "btnLogin";
-            btnLogin.Size = new Size(128, 41);
+            btnLogin.Size = new Size(112, 41);
             btnLogin.TabIndex = 0;
             btnLogin.Text = "Đăng nhập";
             btnLogin.UseVisualStyleBackColor = true;
@@ -106,17 +107,28 @@
             // lbStatus
             // 
             lbStatus.AutoSize = true;
-            lbStatus.Location = new Point(119, 234);
+            lbStatus.Location = new Point(95, 234);
             lbStatus.Name = "lbStatus";
             lbStatus.Size = new Size(191, 20);
             lbStatus.TabIndex = 7;
             lbStatus.Text = "Trạng thái: đang đăng nhập";
+            // 
+            // btnRegister
+            // 
+            btnRegister.Location = new Point(222, 172);
+            btnRegister.Name = "btnRegister";
+            btnRegister.Size = new Size(112, 41);
+            btnRegister.TabIndex = 8;
+            btnRegister.Text = "Đăng ký";
+            btnRegister.UseVisualStyleBackColor = true;
+            btnRegister.Click += btnRegister_Click;
             // 
             // frmLogin
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(415, 263);
+            Controls.Add(btnRegister);
             Controls.Add(lbStatus);
             Controls.Add(checkBox1);
             Controls.Add(txtPassword);
@@ -145,5 +157,6 @@
         private TextBox txtPassword;
         private CheckBox checkBox1;
         private Label lbStatus;
+        private Button btnRegister;
     }
 }

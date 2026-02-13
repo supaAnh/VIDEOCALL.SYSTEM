@@ -1,5 +1,4 @@
-﻿using Accord.Video;
-using AForge.Video.DirectShow;
+﻿using AForge.Video.DirectShow;
 using COMMON.DTO;
 using COMMON.Security;
 using NAudio.Wave;

@@ -198,5 +198,67 @@ namespace SERVER.Database
         }
 
 
+
+
+        //
+        //      --- LOGIN & REGISTER DATABASE METHODS ---   
+        //
+
+
+        // Đăng ký user mới
+        public bool RegisterUser(string username, string password)
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    // Kiểm tra user tồn tại chưa
+                    string checkQuery = "SELECT COUNT(*) FROM Users WHERE Username = @u";
+                    SqlCommand checkCmd = new SqlCommand(checkQuery, conn);
+                    checkCmd.Parameters.AddWithValue("@u", username);
+
+                    conn.Open();
+                    int exist = (int)checkCmd.ExecuteScalar();
+                    if (exist > 0) return false; // Tài khoản đã tồn tại
+
+                    // Thêm mới
+                    string query = "INSERT INTO Users (Username, Password) VALUES (@u, @p)";
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@u", username);
+                    cmd.Parameters.AddWithValue("@p", password);
+
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                SERVER.LogUI.LogViewUI.AddLog("Lỗi Register DB: " + ex.Message);
+                return false;
+            }
+        }
+
+        // Kiểm tra đăng nhập
+        public bool CheckLogin(string username, string password)
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    string query = "SELECT COUNT(*) FROM Users WHERE Username = @u AND Password = @p";
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@u", username);
+                    cmd.Parameters.AddWithValue("@p", password);
+
+                    conn.Open();
+                    int count = (int)cmd.ExecuteScalar();
+                    return count > 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                SERVER.LogUI.LogViewUI.AddLog("Lỗi Login DB: " + ex.Message);
+                return false;
+            }
+        }
     }
 }

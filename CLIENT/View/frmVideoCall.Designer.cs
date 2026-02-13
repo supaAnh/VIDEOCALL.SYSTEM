@@ -52,7 +52,6 @@
             tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
             tableLayoutPanel1.Size = new Size(1081, 607);
             tableLayoutPanel1.TabIndex = 0;
-
             // 
             // btnSelectionVideoCall
             // 
@@ -94,6 +93,7 @@
             btnCamera.TabIndex = 2;
             btnCamera.Text = "Cam";
             btnCamera.UseVisualStyleBackColor = false;
+            btnCamera.Click += btnCamera_Click;
             // 
             // btnMicrophone
             // 
@@ -104,6 +104,7 @@
             btnMicrophone.TabIndex = 3;
             btnMicrophone.Text = "Mic";
             btnMicrophone.UseVisualStyleBackColor = false;
+            btnMicrophone.Click += btnMicrophone_Click;
             // 
             // frmVideoCall
             // 

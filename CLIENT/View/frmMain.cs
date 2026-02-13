@@ -236,8 +236,14 @@ namespace CLIENT.View
                                     // Gửi tín hiệu chấp nhận
                                     _videoCallLogic.SendVideoCallSignal(senderIP, "Accept");
 
-                                    // Khởi tạo Form
-                                    frmVideoCall activeCallForm = new frmVideoCall(senderIP, sd.SelectedMoniker, _videoCallLogic);
+                                    // TRUYỀN THÊM sd.IsCameraOn, sd.IsMicOn
+                                    frmVideoCall activeCallForm = new frmVideoCall(
+                                        senderIP,
+                                        sd.SelectedMoniker,
+                                        _videoCallLogic,
+                                        sd.IsCameraOn,
+                                        sd.IsMicOn
+                                    );
 
                                     activeCallForm.Show();
                                 }
@@ -281,8 +287,15 @@ namespace CLIENT.View
             {
                 if (selectDevice.ShowDialog() == DialogResult.OK)
                 {
-                    // Truyền IP mục tiêu, Moniker thiết bị và tham chiếu logic vào Form
-                    frmVideoCall callForm = new frmVideoCall(_selectedTargetIP, selectDevice.SelectedMoniker, _videoCallLogic);
+                    // TRUYỀN THÊM selectDevice.IsCameraOn, selectDevice.IsMicOn
+                    frmVideoCall callForm = new frmVideoCall(
+                        _selectedTargetIP,
+                        selectDevice.SelectedMoniker,
+                        _videoCallLogic,
+                        selectDevice.IsCameraOn,
+                        selectDevice.IsMicOn
+                    );
+
                     callForm.Show();
 
                     // Gửi tín hiệu yêu cầu gọi
@@ -290,6 +303,8 @@ namespace CLIENT.View
                 }
             }
         }
+
+
 
         private void btnSelectionChatBox_Click(object sender, EventArgs e)
         {

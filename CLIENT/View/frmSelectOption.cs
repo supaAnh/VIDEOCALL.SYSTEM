@@ -36,6 +36,11 @@ namespace CLIENT.View
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public string SelectedOutputId { get; set; }
 
+        // Trạng thái Camera và Mic
+        public bool IsCameraOn { get; private set; } = false;
+        public bool IsMicOn { get; private set; } = false;
+
+
         public frmSelectOption()
         {
             InitializeComponent();
@@ -91,8 +96,13 @@ namespace CLIENT.View
             if (cbOutput.SelectedIndex >= 0)
                 this.SelectedOutputId = _outputDevices[cbOutput.SelectedIndex].ID;
 
+
+            IsCameraOn = (_previewSource != null && _previewSource.IsRunning);
+
+            IsMicOn = (_waveIn != null);
+
             StopPreview();
-            if (_waveIn != null) ToggleMicTest();
+            if (_waveIn != null) ToggleMicTest(); // Dừng test trước khi đóng form
 
             this.DialogResult = DialogResult.OK;
             this.Close();

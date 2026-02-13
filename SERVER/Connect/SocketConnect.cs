@@ -325,7 +325,6 @@ public class SocketConnect
             case PackageType.VideoCall:
                 {
                     string vData = Encoding.UTF8.GetString(package.Content);
-                    // Format: Target|Action|Payload
                     if (!vData.Contains("|")) break;
 
                     string[] vParts = vData.Split('|');
@@ -334,10 +333,30 @@ public class SocketConnect
                     string vRawPayload = vParts.Length >= 3 ? vParts[2] : "";
 
                     // 1. Kiểm tra xem vTarget có phải là Group không?
-                    if (groupMembersTable.ContainsKey(vTarget))
+                    // Sử dụng lock để an toàn khi đọc/ghi danh sách thành viên
+                    List<string> targetGroupMembers = null;
+                    bool isGroup = false;
+
+                    lock (groupMembersTable)
+                    {
+                        if (groupMembersTable.ContainsKey(vTarget))
+                        {
+                            isGroup = true;
+                            targetGroupMembers = groupMembersTable[vTarget];
+
+                            //  Nếu người gửi (senderIP) chưa có trong nhóm -> Tự động thêm vào.
+                            // Điều này giúp Client vào sau (Port mới) vẫn được tính là thành viên và nhận được Video từ người khác.
+                            if (!targetGroupMembers.Contains(senderIP))
+                            {
+                                targetGroupMembers.Add(senderIP);
+                                LogViewUI.AddLog($"Video: Đã thêm {senderIP} vào nhóm {vTarget}");
+                            }
+                        }
+                    }
+
+                    if (isGroup && targetGroupMembers != null)
                     {
                         // --- XỬ LÝ CHO GROUP ---
-                        List<string> targetGroupMembers = groupMembersTable[vTarget];
 
                         lock (clientKeys)
                         {
@@ -345,13 +364,14 @@ public class SocketConnect
                             {
                                 string clientIP = item.Key.RemoteEndPoint.ToString();
 
+                                // Kiểm tra Client đích có trong danh sách nhóm không
                                 if (targetGroupMembers.Contains(clientIP) && clientIP != senderIP && item.Key.Connected)
                                 {
                                     try
                                     {
                                         string finalPayload = vRawPayload;
 
-                                        // Re-Encrypt Frame/Audio (Giữ nguyên logic cũ của bạn)
+                                        // Re-Encrypt Frame/Audio
                                         if ((vAction == "Frame" || vAction == "Audio") && !string.IsNullOrEmpty(vRawPayload) && clientKeys.TryGetValue(senderSocket, out byte[] vSenderKey))
                                         {
                                             byte[] originalData = AES_Service.Decrypt(Convert.FromBase64String(vRawPayload), vSenderKey);
@@ -359,12 +379,7 @@ public class SocketConnect
                                             finalPayload = Convert.ToBase64String(reEncrypted);
                                         }
 
-                                        // Xác định danh tính người gửi (Sender Identity)
-                                        // 1. Nếu là "Request" (Mời gọi) -> Gửi TÊN NHÓM (vTarget) để người nhận biết đường join vào nhóm.
-                                        // 2. Nếu là "Frame/Audio/Leave" -> Gửi IP NGƯỜI GỬI (senderIP) để hiển thị đúng từng ô camera.
-
                                         string senderIdentity = (vAction == "Request") ? vTarget : senderIP;
-
                                         string groupForwardData = $"{senderIdentity}|{vAction}|{finalPayload}";
 
                                         byte[] pkg = Encoding.UTF8.GetBytes(groupForwardData);
@@ -377,7 +392,7 @@ public class SocketConnect
                     }
                     else
                     {
-                        // --- XỬ LÝ CHO CÁ NHÂN (1-1) ---
+                        // --- XỬ LÝ CHO CÁ NHÂN (1-1) --- (GIỮ NGUYÊN)
                         lock (clientKeys)
                         {
                             foreach (var item in clientKeys)
@@ -387,7 +402,6 @@ public class SocketConnect
                                     try
                                     {
                                         string finalPayload = vRawPayload;
-                                        // Đổi tên biến 'senderKey' thành 'vSenderKey'
                                         if ((vAction == "Frame" || vAction == "Audio") && !string.IsNullOrEmpty(vRawPayload) && clientKeys.TryGetValue(senderSocket, out byte[] vSenderKey))
                                         {
                                             byte[] originalData = AES_Service.Decrypt(Convert.FromBase64String(vRawPayload), vSenderKey);

@@ -153,36 +153,37 @@ namespace CLIENT.Process
         /// <summary>
         /// Bắt đầu lấy hình ảnh từ Camera và âm thanh từ Mic để stream
         /// </summary>
-        public void StartStreaming(string target, string monikerString)
+        public void StartStreaming(string target, string monikerString, bool isCamOn, bool isMicOn)
         {
             if (string.IsNullOrEmpty(monikerString)) return;
 
             try
             {
+                // 1. Cấu hình Camera nhưng CHƯA START nếu isCamOn = false
                 _videoSource = new VideoCaptureDevice(monikerString);
                 _videoSource.NewFrame += (s, e) =>
                 {
-                    // Tạo bản sao frame để xử lý, tránh lỗi truy cập đồng thời
                     using (Bitmap bmp = (Bitmap)e.Frame.Clone())
                     {
-                        // Nếu đang ghi hình, đẩy frame vào stdin của ffmpeg.exe
                         if (_isRecording && _ffmpegStream != null)
                         {
-                            try
-                            {
-                                bmp.Save(_ffmpegStream, ImageFormat.Bmp);
-                            }
-                            catch { /* Xử lý lỗi pipe */ }
+                            try { bmp.Save(_ffmpegStream, ImageFormat.Bmp); } catch { }
                         }
-
-                        // Gửi frame qua mạng cho đối phương
                         SendFrame(target, bmp);
                     }
                 };
-                _videoSource.Start();
 
-                // Bắt đầu thu âm thanh song song
-                StartAudioCapture(target);
+                // Chỉ bật nếu được yêu cầu
+                if (isCamOn)
+                {
+                    _videoSource.Start();
+                }
+
+                // 2. Cấu hình Mic
+                if (isMicOn)
+                {
+                    StartAudioCapture(target);
+                }
             }
             catch (Exception ex)
             {
@@ -339,7 +340,40 @@ namespace CLIENT.Process
         }
 
 
+        public void ToggleCamera(bool turnOn)
+        {
+            if (_videoSource == null) return;
 
+            if (turnOn && !_videoSource.IsRunning)
+            {
+                _videoSource.Start();
+            }
+            else if (!turnOn && _videoSource.IsRunning)
+            {
+                _videoSource.SignalToStop();
+            }
+        }
+
+        public void ToggleMic(string targetIP, bool turnOn)
+        {
+            if (turnOn)
+            {
+                if (_waveIn == null) StartAudioCapture(targetIP);
+            }
+            else
+            {
+                if (_waveIn != null)
+                {
+                    try
+                    {
+                        _waveIn.StopRecording();
+                        _waveIn.Dispose();
+                    }
+                    catch { }
+                    _waveIn = null;
+                }
+            }
+        }
 
     }
 }

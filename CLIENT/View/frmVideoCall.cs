@@ -24,14 +24,19 @@ namespace CLIENT.View
         private WaveOutEvent _waveOut;
         private BufferedWaveProvider _waveProvider;
 
+        private bool _isCamOn;
+        private bool _isMicOn;
 
-
-        public frmVideoCall(string targetIP, string moniker, CLIENT.Process.VideoCallProcess videoLogic)
+        public frmVideoCall(string targetIP, string moniker, CLIENT.Process.VideoCallProcess videoLogic, bool isCamOn, bool isMicOn)
         {
             InitializeComponent();
             _videoCallLogic = videoLogic;
             _targetIP = targetIP;
             this.myMoniker = moniker;
+
+            // Lưu trạng thái ban đầu
+            _isCamOn = isCamOn;
+            _isMicOn = isMicOn;
 
             // 1. Phải khởi tạo Audio Playback để tránh lỗi luồng
             InitAudioPlayback();
@@ -67,7 +72,7 @@ namespace CLIENT.View
             _videoCallLogic.OnParticipantLeft += RemoveParticipant;
 
             // 2. Bắt đầu stream
-            _videoCallLogic.StartStreaming(_targetIP, myMoniker);
+            _videoCallLogic.StartStreaming(_targetIP, myMoniker, _isCamOn, _isMicOn);
 
             // 3. Thêm chính mình vào giao diện
             AddParticipant("Me");
@@ -316,5 +321,28 @@ namespace CLIENT.View
             catch { }
         }
 
+        private void UpdateButtonState()
+        {
+            // Cập nhật màu sắc nút để người dùng biết đang Bật hay Tắt
+            btnCamera.BackColor = _isCamOn ? Color.LightGreen : Color.IndianRed;
+            btnCamera.Text = _isCamOn ? "Tắt Cam" : "Bật Cam";
+
+            btnMicrophone.BackColor = _isMicOn ? Color.LightGreen : Color.IndianRed;
+            btnMicrophone.Text = _isMicOn ? "Tắt Mic" : "Bật Mic";
+        }
+
+        private void btnMicrophone_Click(object sender, EventArgs e)
+        {
+            _isMicOn = !_isMicOn; // Đảo trạng thái
+            _videoCallLogic.ToggleMic(_targetIP, _isMicOn);
+            UpdateButtonState();
+        }
+
+        private void btnCamera_Click(object sender, EventArgs e)
+        {
+            _isCamOn = !_isCamOn; // Đảo trạng thái
+            _videoCallLogic.ToggleCamera(_isCamOn);
+            UpdateButtonState();
+        }
     }
 }

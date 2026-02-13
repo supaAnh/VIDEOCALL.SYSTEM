@@ -319,21 +319,65 @@ public class SocketConnect
                 }
                 break;
 
-            // 8. Tín hiệu Video Call (Chuyển tiếp tín hiệu, không xử lý trực tiếp)
-            // [SERVER/Connect/SocketConnect.cs]
-
+            //    
+            // 8. Tín hiệu Video Call
+            //
             case PackageType.VideoCall:
                 {
                     string vData = Encoding.UTF8.GetString(package.Content);
+                    // Format: Target|Action|Payload
                     if (!vData.Contains("|")) break;
 
                     string[] vParts = vData.Split('|');
                     string vTarget = vParts[0];
-                    string vAction = vParts[1]; // "Request", "Frame", "Audio", "Accept", ...
+                    string vAction = vParts[1];
                     string vRawPayload = vParts.Length >= 3 ? vParts[2] : "";
 
-                    if (clientKeys.TryGetValue(senderSocket, out byte[] videoSenderKey))
+                    // 1. Kiểm tra xem vTarget có phải là Group không?
+                    if (groupMembersTable.ContainsKey(vTarget))
                     {
+                        // --- XỬ LÝ CHO GROUP ---
+                        List<string> targetGroupMembers = groupMembersTable[vTarget];
+
+                        lock (clientKeys)
+                        {
+                            foreach (var item in clientKeys)
+                            {
+                                string clientIP = item.Key.RemoteEndPoint.ToString();
+
+                                if (targetGroupMembers.Contains(clientIP) && clientIP != senderIP && item.Key.Connected)
+                                {
+                                    try
+                                    {
+                                        string finalPayload = vRawPayload;
+
+                                        // Re-Encrypt Frame/Audio (Giữ nguyên logic cũ của bạn)
+                                        if ((vAction == "Frame" || vAction == "Audio") && !string.IsNullOrEmpty(vRawPayload) && clientKeys.TryGetValue(senderSocket, out byte[] vSenderKey))
+                                        {
+                                            byte[] originalData = AES_Service.Decrypt(Convert.FromBase64String(vRawPayload), vSenderKey);
+                                            byte[] reEncrypted = AES_Service.Encrypt(originalData, item.Value);
+                                            finalPayload = Convert.ToBase64String(reEncrypted);
+                                        }
+
+                                        // Xác định danh tính người gửi (Sender Identity)
+                                        // 1. Nếu là "Request" (Mời gọi) -> Gửi TÊN NHÓM (vTarget) để người nhận biết đường join vào nhóm.
+                                        // 2. Nếu là "Frame/Audio/Leave" -> Gửi IP NGƯỜI GỬI (senderIP) để hiển thị đúng từng ô camera.
+
+                                        string senderIdentity = (vAction == "Request") ? vTarget : senderIP;
+
+                                        string groupForwardData = $"{senderIdentity}|{vAction}|{finalPayload}";
+
+                                        byte[] pkg = Encoding.UTF8.GetBytes(groupForwardData);
+                                        item.Key.Send(new DataPackage(PackageType.VideoCall, pkg).Pack());
+                                    }
+                                    catch (Exception ex) { LogViewUI.AddLog($"Lỗi Forward Group Video: {ex.Message}"); }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // --- XỬ LÝ CHO CÁ NHÂN (1-1) ---
                         lock (clientKeys)
                         {
                             foreach (var item in clientKeys)
@@ -342,30 +386,19 @@ public class SocketConnect
                                 {
                                     try
                                     {
-                                        string finalPayload = vRawPayload; // Mặc định giữ nguyên (cho Request, Accept...)
-
-                                        // CHỈ xử lý giải mã/mã hóa nếu là Frame hoặc Audio
-                                        if ((vAction == "Frame" || vAction == "Audio") && !string.IsNullOrEmpty(vRawPayload))
+                                        string finalPayload = vRawPayload;
+                                        // Đổi tên biến 'senderKey' thành 'vSenderKey'
+                                        if ((vAction == "Frame" || vAction == "Audio") && !string.IsNullOrEmpty(vRawPayload) && clientKeys.TryGetValue(senderSocket, out byte[] vSenderKey))
                                         {
-                                            // 1. Giải mã bằng Key người gửi
-                                            byte[] encryptedBytes = Convert.FromBase64String(vRawPayload);
-                                            byte[] originalData = AES_Service.Decrypt(encryptedBytes, videoSenderKey);
-
-                                            // 2. Mã hóa lại bằng Key người nhận
-                                            byte[] reEncryptedBytes = AES_Service.Encrypt(originalData, item.Value);
-                                            finalPayload = Convert.ToBase64String(reEncryptedBytes);
+                                            byte[] originalData = AES_Service.Decrypt(Convert.FromBase64String(vRawPayload), vSenderKey);
+                                            byte[] reEncrypted = AES_Service.Encrypt(originalData, item.Value);
+                                            finalPayload = Convert.ToBase64String(reEncrypted);
                                         }
 
-                                        // 3. Đóng gói tin nhắn (Thay IP đích bằng IP người gửi để Client nhận biết ai gọi)
-                                        string videoForwardPayload = $"{senderIP}|{vAction}|{finalPayload}";
-                                        byte[] vContent = Encoding.UTF8.GetBytes(videoForwardPayload);
-
-                                        item.Key.Send(new DataPackage(PackageType.VideoCall, vContent).Pack());
+                                        string p2pData = $"{senderIP}|{vAction}|{finalPayload}";
+                                        item.Key.Send(new DataPackage(PackageType.VideoCall, Encoding.UTF8.GetBytes(p2pData)).Pack());
                                     }
-                                    catch (Exception ex)
-                                    {
-                                        LogViewUI.AddLog($"Lỗi chuyển tiếp Video ({vAction}): {ex.Message}");
-                                    }
+                                    catch (Exception ex) { LogViewUI.AddLog($"Lỗi Forward P2P Video: {ex.Message}"); }
                                     break;
                                 }
                             }
@@ -373,13 +406,11 @@ public class SocketConnect
                     }
                 }
                 break;
+
+
         }
     }
 
-
-
-
-    // Hàm bổ trợ
 
     // Gửi trực tiếp đến một client dựa trên IP
 
@@ -403,7 +434,9 @@ public class SocketConnect
             }
         }
     }
-    // Hàm bổ trợ: Gửi cho danh sách IP cụ thể
+
+
+    // Gửi cho danh sách IP cụ thể
     private void BroadcastToList(List<string> ips, byte[] data)
     {
         lock (clientKeys)
@@ -418,7 +451,7 @@ public class SocketConnect
         }
     }
 
-    // Hàm bổ trợ: Gửi tin nhắn nhóm (có mã hóa riêng cho từng người)
+    // Gửi tin nhắn nhóm (có mã hóa riêng cho từng người)
     private void BroadcastToGroup(List<string> members, string rawData, Socket sender)
     {
         lock (clientKeys)

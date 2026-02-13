@@ -124,11 +124,35 @@ namespace CLIENT.View
             }
         }
 
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            // Dừng camera preview nếu đang chạy
+            StopPreview();
+
+            // Dừng mic test nếu đang chạy
+            if (_waveIn != null)
+            {
+                try
+                {
+                    _waveIn.StopRecording();
+                    _waveIn.Dispose();
+                }
+                catch { }
+                _waveIn = null;
+            }
+
+            base.OnFormClosing(e);
+        }
+
         private void StopPreview()
         {
             if (_previewSource != null)
             {
-                _previewSource.SignalToStop();
+                if (_previewSource.IsRunning)
+                {
+                    _previewSource.SignalToStop();
+                    _previewSource.WaitForStop(); // Bắt buộc đợi tắt hẳn
+                }
                 _previewSource = null;
             }
             pictureBoxCamPreview.Image = null;

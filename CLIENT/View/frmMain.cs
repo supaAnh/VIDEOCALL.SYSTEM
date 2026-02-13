@@ -66,6 +66,18 @@ namespace CLIENT.View
         }
 
 
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            // Gửi gói tin thông báo ngắt kết nối đến server trước khi đóng form
+            Application.Exit();
+        }
+
+
+
+
+
+
         private void HandleIncomingData(byte[] data)
         {
             // Giải mã gói tin thô nhận được từ server
@@ -221,14 +233,11 @@ namespace CLIENT.View
                             {
                                 if (sd.ShowDialog() == DialogResult.OK)
                                 {
-                                    // Gửi tín hiệu chấp nhận TRƯỚC để Server bắt đầu forward dữ liệu
+                                    // Gửi tín hiệu chấp nhận
                                     _videoCallLogic.SendVideoCallSignal(senderIP, "Accept");
 
-                                    // Khởi tạo Form và thêm ngay senderIP vào danh sách để scale lưới ngay lập tức
+                                    // Khởi tạo Form
                                     frmVideoCall activeCallForm = new frmVideoCall(senderIP, sd.SelectedMoniker, _videoCallLogic);
-
-                                    // Thêm thủ công đối phương vào Form của Client 2
-                                    activeCallForm.AddParticipant(senderIP);
 
                                     activeCallForm.Show();
                                 }
@@ -249,9 +258,9 @@ namespace CLIENT.View
                         var callForm = Application.OpenForms.OfType<frmVideoCall>().FirstOrDefault();
                         if (callForm != null)
                         {
+                            // Chỉ thêm người dùng vào giao diện
                             callForm.AddParticipant(senderIP);
-                            // QUAN TRỌNG: Bắt đầu đẩy dữ liệu Cam cho người vừa chấp nhận
-                            _videoCallLogic.StartStreaming(senderIP, callForm.myMoniker);
+
                         }
                         break;
 

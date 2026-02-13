@@ -24,6 +24,8 @@ namespace CLIENT.View
         private WaveOutEvent _waveOut;
         private BufferedWaveProvider _waveProvider;
 
+
+
         public frmVideoCall(string targetIP, string moniker, CLIENT.Process.VideoCallProcess videoLogic)
         {
             InitializeComponent();
@@ -59,6 +61,10 @@ namespace CLIENT.View
                     UpdateFrame(senderIP, bmp);
                 }));
             };
+
+
+            // Đăng ký sự kiện khi có người rời cuộc gọi
+            _videoCallLogic.OnParticipantLeft += RemoveParticipant;
 
             // 2. Bắt đầu stream
             _videoCallLogic.StartStreaming(_targetIP, myMoniker);
@@ -223,38 +229,91 @@ namespace CLIENT.View
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            // Gửi tín hiệu "Leave" cho server trước khi đóng
+            // Sử dụng Task.Run để không bị treo giao diện khi gửi mạng
+            Task.Run(() => _videoCallLogic.SendSignal(_targetIP, "Leave"));
+
+            // Dọn dẹp tài nguyên
             CleanUpResources();
+
             base.OnFormClosing(e);
+        }
+
+        private void RemoveParticipant(string participantID)
+        {
+            // Đảm bảo chạy trên luồng UI
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(() => RemoveParticipant(participantID)));
+                return;
+            }
+
+            // Kiểm tra xem ID này có đang hiển thị không
+            if (_participantVideos.ContainsKey(participantID))
+            {
+                try
+                {
+                    // Lấy PictureBox ra
+                    PictureBox pb = _participantVideos[participantID];
+
+                    // Xóa khỏi giao diện (TableLayoutPanel)
+                    tableLayoutPanel1.Controls.Remove(pb);
+
+                    // Giải phóng tài nguyên
+                    pb.Dispose();
+
+                    // Xóa khỏi danh sách quản lý
+                    _participantVideos.Remove(participantID);
+
+                    // Cập nhật lại bố cục lưới video
+                    UpdateVideoLayout();
+
+                    // --- LOGIC KẾT THÚC TỰ ĐỘNG ---
+                    // Nếu danh sách chỉ còn 1 người (là chính mình "Me"), thì kết thúc
+                    if (_participantVideos.Count <= 1)
+                    {
+                        MessageBox.Show("Người chat đã rời đi. Kết thúc cuộc gọi.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        this.Close(); // Đóng form, việc này sẽ kích hoạt OnFormClosing
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Lỗi RemoveParticipant: " + ex.Message);
+                }
+            }
         }
 
         private void ExitCall()
         {
-            // Gửi tín hiệu rời đi
-            Task.Run(() => _videoCallLogic.SendSignal(_targetIP, "Leave"));
-            this.Close(); // Sẽ kích hoạt OnFormClosing
+            this.Close();
         }
 
         private void CleanUpResources()
         {
-            // 1. Dừng Logic
-            _videoCallLogic.OnFrameReceived -= OnFrameReceivedHandler;
-            _videoCallLogic.StopAll();
-
-            // 2. Dừng Audio
-            if (_waveOut != null)
+            try
             {
-                _waveOut.Stop();
-                _waveOut.Dispose();
-                _waveOut = null;
-            }
+                // Hủy đăng ký sự kiện để tránh gọi lại vào Form đã đóng (Lỗi ObjectDisposed)
+                _videoCallLogic.OnFrameReceived -= OnFrameReceivedHandler;
+                _videoCallLogic.OnParticipantLeft -= RemoveParticipant; // <--- Thêm dòng này
 
-            // 3. Giải phóng tất cả hình ảnh đang hiển thị
-            foreach (var pb in _participantVideos.Values)
-            {
-                if (pb.Image != null) pb.Image.Dispose();
-                pb.Dispose();
+                _videoCallLogic.StopAll();
+
+                if (_waveOut != null)
+                {
+                    _waveOut.Stop();
+                    _waveOut.Dispose();
+                    _waveOut = null;
+                }
+
+                // Giải phóng ảnh trong các PictureBox
+                foreach (var pb in _participantVideos.Values)
+                {
+                    if (pb.Image != null) pb.Image.Dispose();
+                    pb.Dispose();
+                }
+                _participantVideos.Clear();
             }
-            _participantVideos.Clear();
+            catch { }
         }
 
     }

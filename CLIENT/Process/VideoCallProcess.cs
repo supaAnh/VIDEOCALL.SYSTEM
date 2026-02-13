@@ -26,6 +26,9 @@ namespace CLIENT.Process
         public event Action<string, Bitmap> OnFrameReceived;
         public event Action<byte[]> OnAudioReceived;
 
+        // Sự kiện khi có người rời cuộc gọi
+        public event Action<string> OnParticipantLeft;
+
         public VideoCallProcess(ClientSocketConnect client)
         {
             _client = client;
@@ -73,29 +76,50 @@ namespace CLIENT.Process
         {
             try
             {
-                // 1. Giải mã Base64 -> Byte[] -> Decrypt AES
-                byte[] encryptedData = Convert.FromBase64String(rawPayload);
-                byte[] decryptedData = AES_Service.Decrypt(encryptedData, _client.AesKey);
-
-                if (action == "Frame")
+                // 1. Xử lý các tín hiệu điều khiển (Không cần giải mã Base64/AES)
+                if (action == "Leave")
                 {
-                    using (MemoryStream ms = new MemoryStream(decryptedData))
-                    {
-                        // Tạo Bitmap từ Stream
-                        using (Bitmap tempBmp = new Bitmap(ms))
-                        {
-                            // QUAN TRỌNG: Clone ra Bitmap mới để ngắt kết nối với MemoryStream 'ms'.
-                            // Nếu không có bước này, khi 'ms' bị Dispose, Bitmap sẽ bị lỗi GDI+.
-                            Bitmap safeFrame = new Bitmap(tempBmp);
+                    OnParticipantLeft?.Invoke(senderIP);
+                    return; // Thoát luôn sau khi xử lý xong
+                }
+                else if (action == "Request" || action == "Accept" || action == "Refuse")
+                {
+                    // Có thể bắn sự kiện cho UI xử lý hiển thị thông báo/trạng thái
+                    return;
+                }
 
-                            // Kích hoạt sự kiện vẽ lên Form
-                            OnFrameReceived?.Invoke(senderIP, safeFrame);
+                // 2. Chỉ giải mã khi là dữ liệu Media (Frame/Audio) và payload có dữ liệu
+                if (!string.IsNullOrWhiteSpace(rawPayload))
+                {
+                    try
+                    {
+                        byte[] encryptedData = Convert.FromBase64String(rawPayload);
+                        byte[] decryptedData = AES_Service.Decrypt(encryptedData, _client.AesKey);
+
+                        if (action == "Frame")
+                        {
+                            using (MemoryStream ms = new MemoryStream(decryptedData))
+                            {
+                                using (Bitmap tempBmp = new Bitmap(ms))
+                                {
+                                    Bitmap safeFrame = new Bitmap(tempBmp);
+                                    OnFrameReceived?.Invoke(senderIP, safeFrame);
+                                }
+                            }
+                        }
+                        else if (action == "Audio")
+                        {
+                            OnAudioReceived?.Invoke(decryptedData);
                         }
                     }
-                }
-                else if (action == "Audio")
-                {
-                    OnAudioReceived?.Invoke(decryptedData);
+                    catch (FormatException)
+                    {
+                        // Bỏ qua lỗi Base64 nếu payload không đúng định dạng
+                    }
+                    catch (System.Security.Cryptography.CryptographicException)
+                    {
+                        // Bỏ qua lỗi giải mã
+                    }
                 }
             }
             catch (Exception ex)
@@ -253,25 +277,36 @@ namespace CLIENT.Process
         /// </summary>
         public void StopAll()
         {
-            // Hủy đăng ký sự kiện để tránh lỗi
+            // 1. Ngắt kết nối sự kiện nhận dữ liệu
             _client.OnRawDataReceived -= Client_OnRawDataReceived;
 
-            // 1. Dừng Camera
+            // 2. TẮT CAMERA
             if (_videoSource != null)
             {
-                if (_videoSource.IsRunning) _videoSource.SignalToStop();
+                if (_videoSource.IsRunning)
+                {
+                    // Quan trọng: Hủy sự kiện NewFrame để không xử lý ảnh mới nữa
+                    _videoSource.SignalToStop();
+                    _videoSource.WaitForStop();
+                }
                 _videoSource = null;
             }
 
-            // 2. Dừng Mic
+            // 3. TẮT MIC
             if (_waveIn != null)
             {
-                try { _waveIn.StopRecording(); } catch { }
-                _waveIn.Dispose();
+                try
+                {
+                    _waveIn.StopRecording();
+                    // Dispose mic đôi khi cần 1 chút thời gian để nhả driver
+                    System.Threading.Thread.Sleep(100);
+                    _waveIn.Dispose();
+                }
+                catch { }
                 _waveIn = null;
             }
 
-            // 3. Dừng Ghi hình
+            // 3. DỪNG GHI HÌNH (FFMPEG)
             if (_isRecording)
             {
                 _isRecording = false;
@@ -286,14 +321,25 @@ namespace CLIENT.Process
                     _ffmpegStream = null;
                 }
 
-                if (_ffmpegProcess != null && !_ffmpegProcess.HasExited)
+                if (_ffmpegProcess != null)
                 {
-                    _ffmpegProcess.WaitForExit(1000);
-                    try { _ffmpegProcess.Kill(); } catch { }
+                    try
+                    {
+                        if (!_ffmpegProcess.HasExited)
+                        {
+                            _ffmpegProcess.Kill(); // Đảm bảo ffmpeg dừng hẳn
+                            _ffmpegProcess.WaitForExit();
+                        }
+                    }
+                    catch { }
                     _ffmpegProcess.Dispose();
                     _ffmpegProcess = null;
                 }
             }
         }
+
+
+
+
     }
 }

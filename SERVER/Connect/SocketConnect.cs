@@ -424,7 +424,45 @@ public class SocketConnect
                     string vAction = vParts[1];
                     string vRawPayload = vParts.Length >= 3 ? vParts[2] : "";
 
-                    // Logic Video Call giữ nguyên nhưng ForwardToClient sẽ xử lý map username
+                    // Giải mã dữ liệu video từ khóa người gửi và mã hóa lại bằng khóa người nhận
+                    if (!string.IsNullOrEmpty(vRawPayload) && (vAction == "Frame" || vAction == "Audio"))
+                    {
+                        // Đổi tên biến thành vSenderKey để tránh lỗi trùng scope với SecureMessage
+                        if (clientKeys.TryGetValue(senderSocket, out byte[] vSenderKey))
+                        {
+                            try
+                            {
+                                byte[] rawEncrypted = Convert.FromBase64String(vRawPayload);
+                                byte[] decryptedVideo = COMMON.Security.AES_Service.Decrypt(rawEncrypted, vSenderKey);
+
+                                // Tìm khóa của người nhận
+                                byte[] targetKey = null;
+                                lock (_socketToUser)
+                                {
+                                    foreach (var pair in _socketToUser)
+                                    {
+                                        if (pair.Value == vTarget && pair.Key.Connected)
+                                        {
+                                            if (clientKeys.TryGetValue(pair.Key, out targetKey))
+                                                break;
+                                        }
+                                    }
+                                }
+
+                                if (targetKey != null)
+                                {
+                                    byte[] reEncryptedVideo = COMMON.Security.AES_Service.Encrypt(decryptedVideo, targetKey);
+                                    vRawPayload = Convert.ToBase64String(reEncryptedVideo);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                SERVER.LogUI.LogViewUI.AddLog($"Lỗi định tuyến VideoCall: {ex.Message}");
+                            }
+                        }
+                    }
+
+                    // ForwardToClient sẽ đóng gói và mã hóa lớp vỏ bảo vệ bên ngoài
                     ForwardToClient(vTarget, senderIdentity, $"{vAction}|{vRawPayload}", COMMON.DTO.PackageType.VideoCall);
                 }
                 break;

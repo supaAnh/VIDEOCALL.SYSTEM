@@ -170,16 +170,22 @@ namespace CLIENT.View
         {
             try
             {
-                string decrypted = AES_Service.DecryptString(content, _client.AesKey);
+                string decrypted = COMMON.Security.AES_Service.DecryptString(content, _client.AesKey);
                 string[] parts = decrypted.Split('|');
                 string gName = parts[0], sIP = parts[1], msg = parts[2];
 
                 this.Invoke(new Action(() =>
                 {
                     if (_selectedTargetIP == gName)
-                        txtChatBox.AppendText($"[{sIP}]: {msg}{Environment.NewLine}");
+                    {
+                        string myUsername = this.Text.Replace("CLIENT - ", "").Trim();
+                        string displayUser = (sIP == myUsername) ? "Tôi" : sIP;
+                        txtChatBox.AppendText($"[{displayUser}]: {msg}{Environment.NewLine}");
+                    }
                     else
+                    {
                         MessageBox.Show($"Tin nhắn mới từ nhóm {gName}");
+                    }
                 }));
             }
             catch (Exception ex) { MessageBox.Show("Lỗi giải mã tin nhắn nhóm: " + ex.Message); }
@@ -189,7 +195,7 @@ namespace CLIENT.View
         {
             try
             {
-                string decrypted = AES_Service.DecryptString(content, _client.AesKey);
+                string decrypted = COMMON.Security.AES_Service.DecryptString(content, _client.AesKey);
                 if (decrypted.Contains("|"))
                 {
                     string[] parts = decrypted.Split('|');
@@ -197,19 +203,31 @@ namespace CLIENT.View
 
                     this.Invoke(new Action(() =>
                     {
-                        if (sIP == _selectedTargetIP)
-                            txtChatBox.AppendText($"[{sIP}]: {msg}{Environment.NewLine}");
+                        // Lấy Username của chính mình từ Tiêu đề Form
+                        string myUsername = this.Text.Replace("CLIENT - ", "").Trim();
+
+                        // Cập nhật khung chat mới nhất: Nếu tin nhắn do chính mình gửi hoặc người đang chat gửi
+                        if (sIP == _selectedTargetIP || sIP == myUsername)
+                        {
+                            string displayUser = (sIP == myUsername) ? "Tôi" : sIP;
+                            txtChatBox.AppendText($"[{displayUser}]: {msg}{Environment.NewLine}");
+                        }
                         else
+                        {
                             MessageBox.Show($"Tin nhắn mới từ [{sIP}]: {msg}");
+                        }
                     }));
                 }
             }
             catch (Exception ex) { MessageBox.Show("Lỗi hiển thị chat: " + ex.Message); }
         }
 
+       
+
         private void HandleVideoCall(byte[] content)
         {
-            string rawSignal = Encoding.UTF8.GetString(content);
+            // Cần giải mã nội dung gói tin trước khi đọc bằng khóa AES
+            string rawSignal = COMMON.Security.AES_Service.DecryptString(content, _client.AesKey);
             string[] parts = rawSignal.Split('|');
 
             // Cấu trúc nhận được: [SenderIP]|[Status]|[Payload]
@@ -250,14 +268,15 @@ namespace CLIENT.View
                                 else { _videoCallLogic.SendVideoCallSignal(senderIP, "Refuse"); }
                             }
                         }
+                        else
+                        {
+                            _videoCallLogic.SendVideoCallSignal(senderIP, "Refuse");
+                        }
                         break;
 
                     case "Frame":
                     case "Audio":
-                        if (!string.IsNullOrEmpty(payload))
-                        {
-                            _videoCallLogic.ProcessIncomingVideoData(senderIP, status, payload);
-                        }
+                        // Bỏ qua do luồng dữ liệu truyền Media được xử lý bên trong VideoCallProcess
                         break;
 
                     case "Accept":
@@ -266,7 +285,6 @@ namespace CLIENT.View
                         {
                             // Chỉ thêm người dùng vào giao diện
                             callForm.AddParticipant(senderIP);
-
                         }
                         break;
 

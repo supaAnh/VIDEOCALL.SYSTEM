@@ -41,34 +41,9 @@ namespace CLIENT.View
             // 1. Phải khởi tạo Audio Playback để tránh lỗi luồng
             InitAudioPlayback();
 
-            _videoCallLogic.OnAudioReceived += (audioData) =>
-            {
-                if (_waveProvider != null)
-                {
-                    try
-                    {
-                        _waveProvider.AddSamples(audioData, 0, audioData.Length);
-                    }
-                    catch { /* Bỏ qua nếu buffer đầy */ }
-                }
-            };
-
-            _videoCallLogic.OnFrameReceived += (senderIP, bmp) =>
-            {
-                if (this.IsDisposed) return;
-                this.BeginInvoke(new Action(() =>
-                {
-                    // Nếu là người mới (không phải "Me" và chưa có trong danh sách)
-                    if (!_participantVideos.ContainsKey(senderIP))
-                    {
-                        AddParticipant(senderIP);
-                    }
-                    UpdateFrame(senderIP, bmp);
-                }));
-            };
-
-
-            // Đăng ký sự kiện khi có người rời cuộc gọi
+            // Dùng Delegate chính xác để tránh leak memory và cập nhật khung hình
+            _videoCallLogic.OnAudioReceived += OnAudioReceivedHandler;
+            _videoCallLogic.OnFrameReceived += OnFrameReceivedHandler;
             _videoCallLogic.OnParticipantLeft += RemoveParticipant;
 
             // 2. Bắt đầu stream

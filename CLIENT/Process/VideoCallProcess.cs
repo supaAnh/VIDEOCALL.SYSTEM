@@ -47,8 +47,8 @@ namespace CLIENT.Process
                 // 2. Chỉ xử lý nếu là gói tin VideoCall
                 if (package.Type == PackageType.VideoCall)
                 {
-                    // 3. Tách payload: TargetIP|Action|Base64Data
-                    string rawContent = Encoding.UTF8.GetString(package.Content);
+                    // 3. Tách payload: TargetIP|Action|Base64Data. CẦN GIẢI MÃ BẰNG KHÓA AES TRƯỚC
+                    string rawContent = COMMON.Security.AES_Service.DecryptString(package.Content, _client.AesKey);
                     string[] parts = rawContent.Split('|');
 
                     if (parts.Length >= 3)

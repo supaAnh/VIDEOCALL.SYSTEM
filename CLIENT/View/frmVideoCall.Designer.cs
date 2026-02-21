@@ -36,6 +36,7 @@
             thoátToolStripMenuItem = new ToolStripMenuItem();
             btnCamera = new Button();
             btnMicrophone = new Button();
+            btnRecord = new Button();
             contextMenuStrip1.SuspendLayout();
             SuspendLayout();
             // 
@@ -106,12 +107,22 @@
             btnMicrophone.UseVisualStyleBackColor = false;
             btnMicrophone.Click += btnMicrophone_Click;
             // 
+            // btnRecord
+            // 
+            btnRecord.Location = new Point(95, 12);
+            btnRecord.Name = "btnRecord";
+            btnRecord.Size = new Size(86, 43);
+            btnRecord.TabIndex = 4;
+            btnRecord.Text = "Ghi hình";
+            btnRecord.UseVisualStyleBackColor = true;
+            // 
             // frmVideoCall
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.White;
             ClientSize = new Size(1081, 607);
+            Controls.Add(btnRecord);
             Controls.Add(btnMicrophone);
             Controls.Add(btnCamera);
             Controls.Add(btnSelectionVideoCall);
@@ -132,5 +143,6 @@
         private ToolStripMenuItem thoátToolStripMenuItem;
         private Button btnCamera;
         private Button btnMicrophone;
+        private Button btnRecord;
     }
 }

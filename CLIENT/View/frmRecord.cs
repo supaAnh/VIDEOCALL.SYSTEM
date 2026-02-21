@@ -86,30 +86,16 @@ namespace CLIENT.View
             {
                 try
                 {
-                    // Ưu tiên 1: Dùng ffplay.exe (nếu bạn để chung thư mục với ffmpeg.exe)
-                    if (File.Exists("ffplay.exe"))
+                    // Truyền đường dẫn file vào Windows Media Player control trên Form và yêu cầu phát
+                    if (axWindowsMediaPlayer1 != null)
                     {
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                        {
-                            FileName = "ffplay.exe",
-                            Arguments = $"-autoexit \"{filePath}\"", // Tự tắt khi chạy xong
-                            UseShellExecute = false,
-                            CreateNoWindow = true
-                        });
-                    }
-                    else
-                    {
-                        // Ưu tiên 2: Mở bằng trình phát video mặc định của Windows
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                        {
-                            FileName = filePath,
-                            UseShellExecute = true
-                        });
+                        axWindowsMediaPlayer1.URL = filePath;
+                        axWindowsMediaPlayer1.Ctlcontrols.play();
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Không thể mở video: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Không thể phát video: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
             else

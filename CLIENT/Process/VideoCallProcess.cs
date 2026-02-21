@@ -16,10 +16,15 @@ namespace CLIENT.Process
         private VideoCaptureDevice _videoSource;
         private WaveInEvent _waveIn;
 
-        // Sử dụng đường dẫn đầy đủ để tránh xung đột với namespace CLIENT.Process
+        // Ghi hình cuộc gọi
         private System.Diagnostics.Process _ffmpegProcess;
         private Stream _ffmpegStream;
         public bool _isRecording = false;
+
+        // ghi âm cuộc gọi
+        private WaveFileWriter _micWriter;
+        private WaveFileWriter _speakerWriter;
+        private string _currentRecordPath;
 
         // Sự kiện để báo cho UI biết có hình ảnh hoặc âm thanh mới
         public event Action<string, Bitmap> OnFrameReceived;
@@ -71,6 +76,74 @@ namespace CLIENT.Process
         /// <summary>
         /// Xử lý dữ liệu hình ảnh/âm thanh đã nhận và giải mã
         /// </summary>
+
+
+        // --- CÁC CHỨC NĂNG GỬI ĐI ---
+
+        public void StartFormRecording(string outputPath)
+        {
+            if (_isRecording) return;
+            try
+            {
+                _currentRecordPath = outputPath;
+
+                // Khởi tạo file WAV cho Mic (của bạn) và Speaker (của người kia) - 16000Hz, 16bit, Mono
+                _micWriter = new WaveFileWriter(outputPath + ".mic.wav", new WaveFormat(16000, 16, 1));
+                _speakerWriter = new WaveFileWriter(outputPath + ".speaker.wav", new WaveFormat(16000, 16, 1));
+
+                _ffmpegProcess = new System.Diagnostics.Process();
+                _ffmpegProcess.StartInfo.FileName = "ffmpeg.exe";
+
+                // Cấu hình FFMPEG: Nhận ảnh từ luồng (pipe), tốc độ 10 fps, xuất ra mp4
+                _ffmpegProcess.StartInfo.Arguments = $"-y -f image2pipe -vcodec bmp -r 10 -i - -c:v libx264 -preset ultrafast -pix_fmt yuv420p \"{outputPath}\"";
+
+                _ffmpegProcess.StartInfo.UseShellExecute = false;
+                _ffmpegProcess.StartInfo.RedirectStandardInput = true;
+                _ffmpegProcess.StartInfo.CreateNoWindow = true;
+
+                _ffmpegProcess.Start();
+                _ffmpegStream = _ffmpegProcess.StandardInput.BaseStream;
+                _isRecording = true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Lỗi khởi động ffmpeg: " + ex.Message);
+            }
+        }
+
+        public void StartAudioCapture(string targetIP)
+        {
+            try
+            {
+                // Cấu hình mic: 16kHz, 16bit, Mono
+                _waveIn = new WaveInEvent { WaveFormat = new WaveFormat(16000, 16, 1) };
+                _waveIn.DataAvailable += (s, e) =>
+                {
+                    if (e.BytesRecorded > 0)
+                    {
+                        // Chỉ lấy đúng số byte thu được
+                        byte[] audioChunk = new byte[e.BytesRecorded];
+                        Array.Copy(e.Buffer, 0, audioChunk, 0, e.BytesRecorded);
+
+                        // --- LƯU TIẾNG CỦA BẠN (MIC) VÀO FILE NẾU ĐANG GHI HÌNH ---
+                        if (_isRecording && _micWriter != null)
+                        {
+                            try { _micWriter.Write(audioChunk, 0, audioChunk.Length); } catch { }
+                        }
+
+                        byte[] encryptedAudio = AES_Service.Encrypt(audioChunk, _client.AesKey);
+                        string payload = $"{targetIP}|Audio|{Convert.ToBase64String(encryptedAudio)}";
+                        _client.Send(new DataPackage(PackageType.VideoCall, Encoding.UTF8.GetBytes(payload)).Pack());
+                    }
+                };
+                _waveIn.StartRecording();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Lỗi thu âm: " + ex.Message);
+            }
+        }
+
         public void ProcessIncomingVideoData(string senderIP, string action, string rawPayload)
         {
             try
@@ -108,6 +181,12 @@ namespace CLIENT.Process
                         }
                         else if (action == "Audio")
                         {
+                            // --- LƯU TIẾNG CỦA ĐỐI TÁC (SPEAKER) VÀO FILE NẾU ĐANG GHI HÌNH ---
+                            if (_isRecording && _speakerWriter != null)
+                            {
+                                try { _speakerWriter.Write(decryptedData, 0, decryptedData.Length); } catch { }
+                            }
+
                             OnAudioReceived?.Invoke(decryptedData);
                         }
                     }
@@ -127,7 +206,165 @@ namespace CLIENT.Process
             }
         }
 
-        // --- CÁC CHỨC NĂNG GỬI ĐI ---
+        public void StopRecordingOnly()
+        {
+            if (_isRecording)
+            {
+                _isRecording = false;
+
+                // 1. Đóng luồng file WAV (Mic và Speaker)
+                if (_micWriter != null) { try { _micWriter.Close(); _micWriter.Dispose(); } catch { } _micWriter = null; }
+                if (_speakerWriter != null) { try { _speakerWriter.Close(); _speakerWriter.Dispose(); } catch { } _speakerWriter = null; }
+
+                // 2. Đóng stream hình ảnh
+                if (_ffmpegStream != null)
+                {
+                    try
+                    {
+                        _ffmpegStream.Flush();
+                        _ffmpegStream.Close(); // Đóng stream để FFMPEG biết đã kết thúc file
+                    }
+                    catch { }
+                    _ffmpegStream = null;
+                }
+
+                // 3. Đợi FFMPEG xử lý xong MP4 (hiện tại chưa có âm thanh)
+                if (_ffmpegProcess != null)
+                {
+                    try
+                    {
+                        _ffmpegProcess.WaitForExit(3000);
+                        if (!_ffmpegProcess.HasExited) _ffmpegProcess.Kill();
+                    }
+                    catch { }
+                    _ffmpegProcess.Dispose();
+                    _ffmpegProcess = null;
+                }
+
+                // 4. Gọi hàm kết hợp Video và Âm thanh
+                CombineVideoAndAudio();
+            }
+        }
+
+        // HÀM MỚI: Thêm hàm này vào trong class VideoCallProcess để trộn âm thanh vào video
+        private void CombineVideoAndAudio()
+        {
+            try
+            {
+                string tempVideo = _currentRecordPath + ".temp.mp4";
+                string micWav = _currentRecordPath + ".mic.wav";
+                string speakerWav = _currentRecordPath + ".speaker.wav";
+
+                // Đổi tên file video gốc thành file tạm
+                if (File.Exists(_currentRecordPath)) File.Move(_currentRecordPath, tempVideo);
+                else return;
+
+                bool hasMic = File.Exists(micWav) && new FileInfo(micWav).Length > 100;
+                bool hasSpeaker = File.Exists(speakerWav) && new FileInfo(speakerWav).Length > 100;
+
+                string args = "";
+
+                // Tùy chọn trộn: cả 2, hoặc 1 trong 2
+                if (hasMic && hasSpeaker)
+                    args = $"-i \"{tempVideo}\" -i \"{micWav}\" -i \"{speakerWav}\" -filter_complex \"[1:a][2:a]amix=inputs=2:duration=longest[a]\" -map 0:v -map \"[a]\" -c:v copy -c:a aac -y \"{_currentRecordPath}\"";
+                else if (hasMic)
+                    args = $"-i \"{tempVideo}\" -i \"{micWav}\" -c:v copy -c:a aac -map 0:v -map 1:a -y \"{_currentRecordPath}\"";
+                else if (hasSpeaker)
+                    args = $"-i \"{tempVideo}\" -i \"{speakerWav}\" -c:v copy -c:a aac -map 0:v -map 1:a -y \"{_currentRecordPath}\"";
+                else
+                {
+                    File.Move(tempVideo, _currentRecordPath); // Trả tên cũ nếu không thu được tiếng nào
+                    return;
+                }
+
+                // Chạy FFMPEG để ghép âm thanh vào Video
+                using (var muxProcess = new System.Diagnostics.Process())
+                {
+                    muxProcess.StartInfo.FileName = "ffmpeg.exe";
+                    muxProcess.StartInfo.Arguments = args;
+                    muxProcess.StartInfo.UseShellExecute = false;
+                    muxProcess.StartInfo.CreateNoWindow = true;
+                    muxProcess.Start();
+                    muxProcess.WaitForExit();
+                }
+
+                // Dọn dẹp các file WAV và MP4 tạm
+                try { File.Delete(tempVideo); } catch { }
+                try { if (File.Exists(micWav)) File.Delete(micWav); } catch { }
+                try { if (File.Exists(speakerWav)) File.Delete(speakerWav); } catch { }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Lỗi trộn âm thanh: " + ex.Message);
+            }
+        }
+
+        public void StopAll()
+        {
+            // 1. Ngắt kết nối sự kiện nhận dữ liệu
+            _client.OnRawDataReceived -= Client_OnRawDataReceived;
+
+            // 2. TẮT CAMERA
+            if (_videoSource != null)
+            {
+                if (_videoSource.IsRunning)
+                {
+                    _videoSource.SignalToStop();
+                    _videoSource.WaitForStop();
+                }
+                _videoSource = null;
+            }
+
+            // 3. TẮT MIC
+            if (_waveIn != null)
+            {
+                try
+                {
+                    _waveIn.StopRecording();
+                    System.Threading.Thread.Sleep(100);
+                    _waveIn.Dispose();
+                }
+                catch { }
+                _waveIn = null;
+            }
+
+            // --- BẢO VỆ: Đóng file WAV nếu form đóng ngang ---
+            if (_micWriter != null) { try { _micWriter.Close(); _micWriter.Dispose(); } catch { } _micWriter = null; }
+            if (_speakerWriter != null) { try { _speakerWriter.Close(); _speakerWriter.Dispose(); } catch { } _speakerWriter = null; }
+
+            // 4. DỪNG GHI HÌNH (FFMPEG)
+            if (_isRecording)
+            {
+                _isRecording = false;
+                if (_ffmpegStream != null)
+                {
+                    try
+                    {
+                        _ffmpegStream.Flush();
+                        _ffmpegStream.Close();
+                    }
+                    catch { }
+                    _ffmpegStream = null;
+                }
+
+                if (_ffmpegProcess != null)
+                {
+                    try
+                    {
+                        if (!_ffmpegProcess.HasExited)
+                        {
+                            _ffmpegProcess.Kill();
+                            _ffmpegProcess.WaitForExit();
+                        }
+                    }
+                    catch { }
+                    _ffmpegProcess.Dispose();
+                    _ffmpegProcess = null;
+                }
+            }
+        }
+
+
 
         /// <summary>
         /// Gửi tín hiệu điều khiển cuộc gọi (Invite, Ringing, Busy, End...)
@@ -164,10 +401,8 @@ namespace CLIENT.Process
                 {
                     using (Bitmap bmp = (Bitmap)e.Frame.Clone())
                     {
-                        if (_isRecording && _ffmpegStream != null)
-                        {
-                            try { bmp.Save(_ffmpegStream, ImageFormat.Bmp); } catch { }
-                        }
+                        // Chỉ gửi frame đi cho người kia, không tự ý ghi vào ffmpeg nữa
+                        // Việc ghi hình đã được frmVideoCall lo bằng RecordTimer_Tick
                         SendFrame(target, bmp);
                     }
                 };
@@ -214,32 +449,7 @@ namespace CLIENT.Process
             catch { }
         }
 
-        public void StartAudioCapture(string targetIP)
-        {
-            try
-            {
-                // Cấu hình mic: 16kHz, 16bit, Mono
-                _waveIn = new WaveInEvent { WaveFormat = new WaveFormat(16000, 16, 1) };
-                _waveIn.DataAvailable += (s, e) =>
-                {
-                    if (e.BytesRecorded > 0)
-                    {
-                        // Chỉ lấy đúng số byte thu được
-                        byte[] audioChunk = new byte[e.BytesRecorded];
-                        Array.Copy(e.Buffer, 0, audioChunk, 0, e.BytesRecorded);
-
-                        byte[] encryptedAudio = AES_Service.Encrypt(audioChunk, _client.AesKey);
-                        string payload = $"{targetIP}|Audio|{Convert.ToBase64String(encryptedAudio)}";
-                        _client.Send(new DataPackage(PackageType.VideoCall, Encoding.UTF8.GetBytes(payload)).Pack());
-                    }
-                };
-                _waveIn.StartRecording();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("Lỗi thu âm: " + ex.Message);
-            }
-        }
+        
 
         /// <summary>
         /// Ghi hình cuộc gọi bằng cách gọi ffmpeg.exe bên ngoài
@@ -275,69 +485,7 @@ namespace CLIENT.Process
         /// <summary>
         /// Dừng tất cả các luồng xử lý (Camera, Mic, Ghi hình)
         /// </summary>
-        public void StopAll()
-        {
-            // 1. Ngắt kết nối sự kiện nhận dữ liệu
-            _client.OnRawDataReceived -= Client_OnRawDataReceived;
-
-            // 2. TẮT CAMERA
-            if (_videoSource != null)
-            {
-                if (_videoSource.IsRunning)
-                {
-                    // Quan trọng: Hủy sự kiện NewFrame để không xử lý ảnh mới nữa
-                    _videoSource.SignalToStop();
-                    _videoSource.WaitForStop();
-                }
-                _videoSource = null;
-            }
-
-            // 3. TẮT MIC
-            if (_waveIn != null)
-            {
-                try
-                {
-                    _waveIn.StopRecording();
-                    // Dispose mic đôi khi cần 1 chút thời gian để nhả driver
-                    System.Threading.Thread.Sleep(100);
-                    _waveIn.Dispose();
-                }
-                catch { }
-                _waveIn = null;
-            }
-
-            // 3. DỪNG GHI HÌNH (FFMPEG)
-            if (_isRecording)
-            {
-                _isRecording = false;
-                if (_ffmpegStream != null)
-                {
-                    try
-                    {
-                        _ffmpegStream.Flush();
-                        _ffmpegStream.Close();
-                    }
-                    catch { }
-                    _ffmpegStream = null;
-                }
-
-                if (_ffmpegProcess != null)
-                {
-                    try
-                    {
-                        if (!_ffmpegProcess.HasExited)
-                        {
-                            _ffmpegProcess.Kill(); // Đảm bảo ffmpeg dừng hẳn
-                            _ffmpegProcess.WaitForExit();
-                        }
-                    }
-                    catch { }
-                    _ffmpegProcess.Dispose();
-                    _ffmpegProcess = null;
-                }
-            }
-        }
-
+        
 
         public void ToggleCamera(bool turnOn)
         {
@@ -380,30 +528,7 @@ namespace CLIENT.Process
         //
 
 
-        public void StartFormRecording(string outputPath)
-        {
-            if (_isRecording) return;
-            try
-            {
-                _ffmpegProcess = new System.Diagnostics.Process();
-                _ffmpegProcess.StartInfo.FileName = "ffmpeg.exe";
-
-                // Cấu hình FFMPEG: Nhận ảnh từ luồng (pipe), tốc độ 10 fps, xuất ra mp4
-                _ffmpegProcess.StartInfo.Arguments = $"-y -f image2pipe -vcodec bmp -r 10 -i - -c:v libx264 -preset ultrafast -pix_fmt yuv420p \"{outputPath}\"";
-
-                _ffmpegProcess.StartInfo.UseShellExecute = false;
-                _ffmpegProcess.StartInfo.RedirectStandardInput = true;
-                _ffmpegProcess.StartInfo.CreateNoWindow = true;
-
-                _ffmpegProcess.Start();
-                _ffmpegStream = _ffmpegProcess.StandardInput.BaseStream;
-                _isRecording = true;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("Lỗi khởi động ffmpeg: " + ex.Message);
-            }
-        }
+        
 
         public void AddFrameToRecord(Bitmap bmp)
         {
@@ -418,34 +543,12 @@ namespace CLIENT.Process
             }
         }
 
-        public void StopRecordingOnly()
-        {
-            if (_isRecording)
-            {
-                _isRecording = false;
-                if (_ffmpegStream != null)
-                {
-                    try
-                    {
-                        _ffmpegStream.Flush();
-                        _ffmpegStream.Close(); // Đóng stream để FFMPEG biết đã kết thúc file
-                    }
-                    catch { }
-                    _ffmpegStream = null;
-                }
 
-                if (_ffmpegProcess != null)
-                {
-                    try
-                    {
-                        _ffmpegProcess.WaitForExit(3000); // Đợi FFMPEG xử lý xong MP4
-                        if (!_ffmpegProcess.HasExited) _ffmpegProcess.Kill();
-                    }
-                    catch { }
-                    _ffmpegProcess.Dispose();
-                    _ffmpegProcess = null;
-                }
-            }
-        }
+        
+
+        
+
+
+
     }
 }

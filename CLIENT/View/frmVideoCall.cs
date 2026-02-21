@@ -342,9 +342,14 @@ namespace CLIENT.View
         {
             try
             {
-                // Chụp lại toàn bộ giao diện của frmVideoCall
-                Bitmap bmp = new Bitmap(this.Width, this.Height);
-                this.DrawToBitmap(bmp, new Rectangle(0, 0, this.Width, this.Height));
+                // làm tròn trừ đi 1 pixel nếu kích thước hiện tại của Form đang là số lẻ
+                int safeWidth = this.Width % 2 == 0 ? this.Width : this.Width - 1;
+                int safeHeight = this.Height % 2 == 0 ? this.Height : this.Height - 1;
+
+                // Chụp lại giao diện với kích thước an toàn
+                Bitmap bmp = new Bitmap(safeWidth, safeHeight);
+                this.DrawToBitmap(bmp, new Rectangle(0, 0, safeWidth, safeHeight));
+
                 _videoCallLogic.AddFrameToRecord(bmp);
                 bmp.Dispose();
             }
@@ -359,7 +364,10 @@ namespace CLIENT.View
                 string downloadsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
                 if (!Directory.Exists(downloadsPath)) Directory.CreateDirectory(downloadsPath);
 
-                string fileName = $"Record_{myMoniker}_{DateTime.Now:yyyyMMdd_HHmmss}.mp4";
+                // SỬA LỖI TẠI ĐÂY: Lọc bỏ các ký tự không hợp lệ đối với tên file trong myMoniker
+                string safeMoniker = string.Join("_", myMoniker.Split(Path.GetInvalidFileNameChars()));
+
+                string fileName = $"Record_{safeMoniker}_{DateTime.Now:yyyyMMdd_HHmmss}.mp4";
                 _currentRecordPath = Path.Combine(downloadsPath, fileName);
 
                 _videoCallLogic.StartFormRecording(_currentRecordPath);
@@ -387,8 +395,8 @@ namespace CLIENT.View
                 btnRecord.Text = "Ghi hình";
                 btnRecord.BackColor = Color.LightGray;
 
-                // Tăng thời gian chờ lên 1 giây để FFMPEG chắc chắn đã nhả file hoàn toàn
-                System.Threading.Thread.Sleep(1000);
+                // Tăng thời gian chờ lên 1.5 giây để FFMPEG chắc chắn đã nhả file MP4 hoàn toàn
+                System.Threading.Thread.Sleep(1500);
 
                 try
                 {

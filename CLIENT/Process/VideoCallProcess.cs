@@ -19,7 +19,7 @@ namespace CLIENT.Process
         // Sử dụng đường dẫn đầy đủ để tránh xung đột với namespace CLIENT.Process
         private System.Diagnostics.Process _ffmpegProcess;
         private Stream _ffmpegStream;
-        private bool _isRecording = false;
+        public bool _isRecording = false;
 
         // Sự kiện để báo cho UI biết có hình ảnh hoặc âm thanh mới
         public event Action<string, Bitmap> OnFrameReceived;
@@ -374,5 +374,78 @@ namespace CLIENT.Process
             }
         }
 
+
+        //
+        //  --- QUAY MÀN HÌNH CUỘC GỌI ---
+        //
+
+
+        public void StartFormRecording(string outputPath)
+        {
+            if (_isRecording) return;
+            try
+            {
+                _ffmpegProcess = new System.Diagnostics.Process();
+                _ffmpegProcess.StartInfo.FileName = "ffmpeg.exe";
+
+                // Cấu hình FFMPEG: Nhận ảnh từ luồng (pipe), tốc độ 10 fps, xuất ra mp4
+                _ffmpegProcess.StartInfo.Arguments = $"-y -f image2pipe -vcodec bmp -r 10 -i - -c:v libx264 -preset ultrafast -pix_fmt yuv420p \"{outputPath}\"";
+
+                _ffmpegProcess.StartInfo.UseShellExecute = false;
+                _ffmpegProcess.StartInfo.RedirectStandardInput = true;
+                _ffmpegProcess.StartInfo.CreateNoWindow = true;
+
+                _ffmpegProcess.Start();
+                _ffmpegStream = _ffmpegProcess.StandardInput.BaseStream;
+                _isRecording = true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Lỗi khởi động ffmpeg: " + ex.Message);
+            }
+        }
+
+        public void AddFrameToRecord(Bitmap bmp)
+        {
+            if (_isRecording && _ffmpegStream != null)
+            {
+                try
+                {
+                    // Ghi đè khung hình vào luồng của ffmpeg
+                    bmp.Save(_ffmpegStream, ImageFormat.Bmp);
+                }
+                catch { }
+            }
+        }
+
+        public void StopRecordingOnly()
+        {
+            if (_isRecording)
+            {
+                _isRecording = false;
+                if (_ffmpegStream != null)
+                {
+                    try
+                    {
+                        _ffmpegStream.Flush();
+                        _ffmpegStream.Close(); // Đóng stream để FFMPEG biết đã kết thúc file
+                    }
+                    catch { }
+                    _ffmpegStream = null;
+                }
+
+                if (_ffmpegProcess != null)
+                {
+                    try
+                    {
+                        _ffmpegProcess.WaitForExit(3000); // Đợi FFMPEG xử lý xong MP4
+                        if (!_ffmpegProcess.HasExited) _ffmpegProcess.Kill();
+                    }
+                    catch { }
+                    _ffmpegProcess.Dispose();
+                    _ffmpegProcess = null;
+                }
+            }
+        }
     }
 }

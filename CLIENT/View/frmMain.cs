@@ -222,7 +222,7 @@ namespace CLIENT.View
             catch (Exception ex) { MessageBox.Show("Lỗi hiển thị chat: " + ex.Message); }
         }
 
-       
+
 
         private void HandleVideoCall(byte[] content)
         {
@@ -290,6 +290,11 @@ namespace CLIENT.View
 
                     case "Refuse":
                         MessageBox.Show($"[{senderIP}] từ chối cuộc gọi.");
+                        break;
+
+                    case "RecordStart":
+                        // Hiển thị thông báo khi có người nhấn nút Record
+                        MessageBox.Show($"[{senderIP}] đang ghi hình cuộc gọi này!", "Thông báo bảo mật", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         break;
                 }
             }));
@@ -411,6 +416,12 @@ namespace CLIENT.View
                 _fileProcess.ExecuteSendFile(_selectedTargetIP, openFileDialog1.FileName);
                 txtChatBox.AppendText($"[Hệ thống]: Đã gửi file [{Path.GetFileName(openFileDialog1.FileName)}] thành công!{Environment.NewLine}");
             }
+        }
+
+        private void btnWatchRecord_Click(object sender, EventArgs e)
+        {
+            frmRecord recordForm = new frmRecord();
+            recordForm.Show();
         }
     }
 }

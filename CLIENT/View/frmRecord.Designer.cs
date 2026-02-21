@@ -28,21 +28,14 @@
         /// </summary>
         private void InitializeComponent()
         {
-            pictureBoxRecord = new PictureBox();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(frmRecord));
             lbRecordList = new ListBox();
             label1 = new Label();
             btnChoose = new Button();
             btnReturn = new Button();
-            ((System.ComponentModel.ISupportInitialize)pictureBoxRecord).BeginInit();
+            axWindowsMediaPlayer1 = new AxWMPLib.AxWindowsMediaPlayer();
+            ((System.ComponentModel.ISupportInitialize)axWindowsMediaPlayer1).BeginInit();
             SuspendLayout();
-            // 
-            // pictureBoxRecord
-            // 
-            pictureBoxRecord.Location = new Point(335, 66);
-            pictureBoxRecord.Name = "pictureBoxRecord";
-            pictureBoxRecord.Size = new Size(646, 451);
-            pictureBoxRecord.TabIndex = 0;
-            pictureBoxRecord.TabStop = false;
             // 
             // lbRecordList
             // 
@@ -79,30 +72,39 @@
             btnReturn.Text = "Trở lại";
             btnReturn.UseVisualStyleBackColor = true;
             // 
+            // axWindowsMediaPlayer1
+            // 
+            axWindowsMediaPlayer1.Enabled = true;
+            axWindowsMediaPlayer1.Location = new Point(344, 66);
+            axWindowsMediaPlayer1.Name = "axWindowsMediaPlayer1";
+            axWindowsMediaPlayer1.OcxState = (AxHost.State)resources.GetObject("axWindowsMediaPlayer1.OcxState");
+            axWindowsMediaPlayer1.Size = new Size(637, 451);
+            axWindowsMediaPlayer1.TabIndex = 5;
+            // 
             // frmRecord
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(993, 529);
+            Controls.Add(axWindowsMediaPlayer1);
             Controls.Add(btnReturn);
             Controls.Add(btnChoose);
             Controls.Add(label1);
             Controls.Add(lbRecordList);
-            Controls.Add(pictureBoxRecord);
             Name = "frmRecord";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "CLIENT - Record";
-            ((System.ComponentModel.ISupportInitialize)pictureBoxRecord).EndInit();
+            Load += FrmRecord_Load;
+            ((System.ComponentModel.ISupportInitialize)axWindowsMediaPlayer1).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
 
         #endregion
-
-        private PictureBox pictureBoxRecord;
         private ListBox lbRecordList;
         private Label label1;
         private Button btnChoose;
         private Button btnReturn;
+        private AxWMPLib.AxWindowsMediaPlayer axWindowsMediaPlayer1;
     }
 }

@@ -33,6 +33,7 @@
             columnHeader1 = new ColumnHeader();
             label1 = new Label();
             panelChooseChat = new Panel();
+            btnWatchRecord = new Button();
             btnSignOut = new Button();
             btnCreateGroupChat = new Button();
             btnChooseTarget = new Button();
@@ -82,6 +83,7 @@
             // 
             // panelChooseChat
             // 
+            panelChooseChat.Controls.Add(btnWatchRecord);
             panelChooseChat.Controls.Add(btnSignOut);
             panelChooseChat.Controls.Add(btnCreateGroupChat);
             panelChooseChat.Controls.Add(btnChooseTarget);
@@ -92,9 +94,19 @@
             panelChooseChat.Size = new Size(262, 489);
             panelChooseChat.TabIndex = 2;
             // 
+            // btnWatchRecord
+            // 
+            btnWatchRecord.Location = new Point(13, 439);
+            btnWatchRecord.Name = "btnWatchRecord";
+            btnWatchRecord.Size = new Size(110, 40);
+            btnWatchRecord.TabIndex = 6;
+            btnWatchRecord.Text = "Xem lại";
+            btnWatchRecord.UseVisualStyleBackColor = true;
+            btnWatchRecord.Click += btnWatchRecord_Click;
+            // 
             // btnSignOut
             // 
-            btnSignOut.Location = new Point(77, 436);
+            btnSignOut.Location = new Point(139, 439);
             btnSignOut.Name = "btnSignOut";
             btnSignOut.Size = new Size(110, 40);
             btnSignOut.TabIndex = 5;
@@ -294,5 +306,6 @@
         private OpenFileDialog openFileDialog1;
         private Button btnSignOut;
         private ColumnHeader columnHeader1;
+        private Button btnWatchRecord;
     }
 }

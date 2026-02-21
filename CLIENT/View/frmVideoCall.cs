@@ -27,6 +27,12 @@ namespace CLIENT.View
         private bool _isCamOn;
         private bool _isMicOn;
 
+        private System.Windows.Forms.Timer _recordTimer;
+        private bool _isRecordingForm = false;
+        private string _currentRecordPath = "";
+        private ClientSocketConnect _clientSocket; // gửi tín hiệu kết thúc ghi âm
+
+
         public frmVideoCall(string targetIP, string moniker, CLIENT.Process.VideoCallProcess videoLogic, bool isCamOn, bool isMicOn)
         {
             InitializeComponent();
@@ -51,6 +57,11 @@ namespace CLIENT.View
 
             // 3. Thêm chính mình vào giao diện
             AddParticipant("Me");
+
+
+            _recordTimer = new System.Windows.Forms.Timer();
+            _recordTimer.Interval = 100;
+            _recordTimer.Tick += RecordTimer_Tick;
         }
 
         //
@@ -319,5 +330,136 @@ namespace CLIENT.View
             _videoCallLogic.ToggleCamera(_isCamOn);
             UpdateButtonState();
         }
+
+
+
+
+        //
+        //  --- QUAY MÀN HÌNH CUỘC GỌI ---
+        //
+
+        private void RecordTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                // Chụp lại toàn bộ giao diện của frmVideoCall
+                Bitmap bmp = new Bitmap(this.Width, this.Height);
+                this.DrawToBitmap(bmp, new Rectangle(0, 0, this.Width, this.Height));
+                _videoCallLogic.AddFrameToRecord(bmp);
+                bmp.Dispose();
+            }
+            catch { }
+        }
+
+        private void btnRecord_Click(object sender, EventArgs e)
+        {
+            if (!_isRecordingForm)
+            {
+                // 1. BẮT ĐẦU GHI
+                string downloadsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                if (!Directory.Exists(downloadsPath)) Directory.CreateDirectory(downloadsPath);
+
+                string fileName = $"Record_{myMoniker}_{DateTime.Now:yyyyMMdd_HHmmss}.mp4";
+                _currentRecordPath = Path.Combine(downloadsPath, fileName);
+
+                _videoCallLogic.StartFormRecording(_currentRecordPath);
+
+                // KIỂM TRA: Nếu VideoCallLogic đã bật IsRecording thành công thì mới chạy UI
+                if (_videoCallLogic._isRecording)
+                {
+                    _recordTimer.Start();
+                    _isRecordingForm = true;
+
+                    btnRecord.Text = "Dừng ghi";
+                    btnRecord.BackColor = Color.Red;
+
+                    // Gửi thông báo cho đối tác
+                    _videoCallLogic.SendSignal(_targetIP, "RecordStart");
+                }
+            }
+            else
+            {
+                // 2. DỪNG GHI VÀ UPLOAD
+                _recordTimer.Stop();
+                _videoCallLogic.StopRecordingOnly();
+                _isRecordingForm = false;
+
+                btnRecord.Text = "Ghi hình";
+                btnRecord.BackColor = Color.LightGray;
+
+                // Tăng thời gian chờ lên 1 giây để FFMPEG chắc chắn đã nhả file hoàn toàn
+                System.Threading.Thread.Sleep(1000);
+
+                try
+                {
+                    string directoryPath = Path.GetDirectoryName(_currentRecordPath);
+
+                    if (File.Exists(_currentRecordPath))
+                    {
+                        // Mở thư mục và bôi đen file sử dụng ProcessStartInfo để tránh lỗi ShellExecute
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "explorer.exe",
+                            Arguments = $"/select,\"{_currentRecordPath}\"",
+                            UseShellExecute = true
+                        });
+                    }
+                    else if (Directory.Exists(directoryPath))
+                    {
+                        // Nếu lưu chậm chưa thấy file, mở thẳng thư mục
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "explorer.exe",
+                            Arguments = $"\"{directoryPath}\"",
+                            UseShellExecute = true
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Thông báo lỗi cụ thể nếu hệ điều hành từ chối mở
+                    MessageBox.Show("Không thể tự động mở thư mục: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+
+                MessageBox.Show($"Đã dừng ghi hình!\nVideo được lưu tại: {_currentRecordPath}", "Ghi hình thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                // Gửi file cho Server lưu DB
+                UploadRecordToServer(_currentRecordPath, Path.GetFileName(_currentRecordPath));
+            }
+        }
+
+        private void UploadRecordToServer(string filePath, string fileName)
+        {
+            try
+            {
+                if (!File.Exists(filePath)) return;
+                byte[] fileData = File.ReadAllBytes(filePath);
+
+                // Dùng chung cấu trúc FilePackageDTO để gửi
+                var fileDto = new FilePackageDTO
+                {
+                    FileName = fileName,
+                    FileData = fileData
+                };
+
+                byte[] rawData = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(fileDto);
+
+                // Cần truy cập _client từ _videoCallLogic (bạn có thể đổi _client trong VideoCallProcess thành public, hoặc truyền ngầm)
+                // Giả sử gọi một hàm gửi gói SaveRecord:
+                byte[] targetIPBytes = Encoding.UTF8.GetBytes(_targetIP);
+                byte[] ipLengthBytes = BitConverter.GetBytes(targetIPBytes.Length);
+
+                // Giải mã giả lập để bọc gói tin
+                byte[] finalPayload = new byte[4 + targetIPBytes.Length + rawData.Length];
+                Buffer.BlockCopy(ipLengthBytes, 0, finalPayload, 0, 4);
+                Buffer.BlockCopy(targetIPBytes, 0, finalPayload, 4, targetIPBytes.Length);
+                Buffer.BlockCopy(rawData, 0, finalPayload, 4 + targetIPBytes.Length, rawData.Length);
+
+                // Lưu ý: Hàm Send ở đây yêu cầu bạn có đối tượng _client. 
+                // Bạn có thể viết thêm 1 hàm public SendRecord(byte[] payload) bên trong VideoCallProcess để gửi.
+            }
+            catch (Exception ex) { MessageBox.Show("Lỗi upload video: " + ex.Message); }
+        }
+
     }
 }

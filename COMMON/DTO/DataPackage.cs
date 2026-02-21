@@ -20,7 +20,8 @@ namespace COMMON.DTO
         GroupMessage = 11,     // Tin nhắn gửi trong nhóm
         VideoCallSignal = 12, // Tín hiệu điều khiển cuộc gọi video (như yêu cầu, từ chối, kết thúc)
         Register = 13,      // Loại gói tin đăng ký
-        LoginResponse = 14  // Server trả về kết quả đăng nhập
+        LoginResponse = 14,  // Server trả về kết quả đăng nhập
+        SaveRecord = 15,     // Gói tin lưu trữ bản ghi cuộc gọi
     }
 
     public class DataPackage

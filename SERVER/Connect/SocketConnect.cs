@@ -466,6 +466,32 @@ public class SocketConnect
                     ForwardToClient(vTarget, senderIdentity, $"{vAction}|{vRawPayload}", COMMON.DTO.PackageType.VideoCall);
                 }
                 break;
+
+            // 9. Lưu Record Video Call
+            case PackageType.SaveRecord:
+                try
+                {
+                    byte[] fullContent = package.Content;
+                    int ipLength = BitConverter.ToInt32(fullContent, 0);
+                    string targetIP = Encoding.UTF8.GetString(fullContent, 4, ipLength);
+
+                    int headerSize = 4 + ipLength;
+                    byte[] rawData = new byte[fullContent.Length - headerSize];
+                    Buffer.BlockCopy(fullContent, headerSize, rawData, 0, rawData.Length);
+
+                    // Giải nén JSON từ mảng byte
+                    var fileDto = System.Text.Json.JsonSerializer.Deserialize<FilePackageDTO>(rawData);
+                    if (fileDto != null)
+                    {
+                        // Lưu vào Database (senderIdentity là người bấm Record, targetIP là người đang gọi)
+                        db.SaveVideoRecord(senderIdentity, targetIP, fileDto.FileName, fileDto.FileData);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    SERVER.LogUI.LogViewUI.AddLog("Lỗi khi nhận Record: " + ex.Message);
+                }
+                break;
         }
     }
 

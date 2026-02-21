@@ -115,6 +115,7 @@
             btnRecord.TabIndex = 4;
             btnRecord.Text = "Ghi hình";
             btnRecord.UseVisualStyleBackColor = true;
+            btnRecord.Click += btnRecord_Click;
             // 
             // frmVideoCall
             // 

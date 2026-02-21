@@ -260,5 +260,36 @@ namespace SERVER.Database
                 return false;
             }
         }
+
+
+        //
+        //  --- RECORD VIDEOCALL---
+        //
+
+        public void SaveVideoRecord(string senderIP, string receiverIP, string fileName, byte[] videoData)
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    // Lưu chung vào bảng ChatHistory hoặc bảng riêng tùy bạn (Ví dụ dùng ChatHistory)
+                    string query = "INSERT INTO ChatHistory (SenderIP, ReceiverIP, ContentVarbinary, Timestamp) VALUES (@sender, @receiver, @content, @time)";
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@sender", senderIP);
+                    cmd.Parameters.AddWithValue("@receiver", receiverIP);
+
+                    // Lưu file mp4 dưới dạng mảng byte
+                    cmd.Parameters.AddWithValue("@content", videoData);
+                    cmd.Parameters.AddWithValue("@time", DateTime.Now);
+
+                    conn.Open();
+                    cmd.ExecuteNonQuery();
+                    SERVER.LogUI.LogViewUI.AddLog($"Đã lưu bản Record ({fileName}) của {senderIP} vào DB.");
+                }
+            }
+            catch (Exception ex) { SERVER.LogUI.LogViewUI.AddLog("Lỗi lưu DB Record: " + ex.Message); }
+        }
+
+
     }
 }

@@ -38,6 +38,7 @@
             listViewClientConnected = new ListView();
             columnHeader3 = new ColumnHeader();
             btnClientOut = new Button();
+            btnWatchRecord = new Button();
             ((System.ComponentModel.ISupportInitialize)textNumPort).BeginInit();
             SuspendLayout();
             // 
@@ -64,7 +65,7 @@
             listViewHistory.Size = new Size(577, 290);
             listViewHistory.TabIndex = 1;
             listViewHistory.UseCompatibleStateImageBehavior = false;
-            listViewHistory.View = View.Details;
+            listViewHistory.View = System.Windows.Forms.View.Details;
             // 
             // columnHeader1
             // 
@@ -117,7 +118,7 @@
             listViewClientConnected.Size = new Size(355, 175);
             listViewClientConnected.TabIndex = 6;
             listViewClientConnected.UseCompatibleStateImageBehavior = false;
-            listViewClientConnected.View = View.Details;
+            listViewClientConnected.View = System.Windows.Forms.View.Details;
             // 
             // columnHeader3
             // 
@@ -136,11 +137,21 @@
             btnClientOut.Text = "Xoá Client";
             btnClientOut.UseVisualStyleBackColor = false;
             // 
+            // btnWatchRecord
+            // 
+            btnWatchRecord.Location = new Point(206, 194);
+            btnWatchRecord.Name = "btnWatchRecord";
+            btnWatchRecord.Size = new Size(150, 56);
+            btnWatchRecord.TabIndex = 8;
+            btnWatchRecord.Text = "Xem lại Record";
+            btnWatchRecord.UseVisualStyleBackColor = true;
+            // 
             // frmMain
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(573, 546);
+            Controls.Add(btnWatchRecord);
             Controls.Add(btnClientOut);
             Controls.Add(listViewClientConnected);
             Controls.Add(textNumPort);
@@ -171,5 +182,6 @@
         private ColumnHeader columnHeader1;
         private ColumnHeader columnHeader2;
         private ColumnHeader columnHeader3;
+        private Button btnWatchRecord;
     }
 }

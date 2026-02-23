@@ -31,6 +31,10 @@ namespace CLIENT.View
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public string SelectedMoniker { get; set; }
 
+
+        private Dictionary<string, List<string>> _groupMembersDict = new Dictionary<string, List<string>>();
+
+
         public frmMain(ClientSocketConnect client)
         {
             InitializeComponent();
@@ -159,16 +163,46 @@ namespace CLIENT.View
             }));
         }
 
+        // CLIENT/View/frmMain.cs
+
         private void HandleGroupUpdate(byte[] content)
         {
-            string groupName = Encoding.UTF8.GetString(content);
+            string payload = Encoding.UTF8.GetString(content);
+            // Tách dữ liệu: parts[0] là Tên nhóm, parts[1] là danh sách user
+            string[] parts = payload.Split('|');
+
+            if (parts.Length < 1) return;
+
+            string groupName = parts[0];
+
+            // Lưu/Cập nhật danh sách thành viên vào Dictionary của Client
+            if (parts.Length >= 2)
+            {
+                List<string> members = parts[1].Split(',').ToList();
+                _groupMembersDict[groupName] = members;
+            }
+
             this.Invoke(new Action(() =>
             {
-                ListViewItem groupItem = new ListViewItem(groupName);
-                groupItem.ForeColor = Color.Blue;
-                groupItem.Font = new Font(lvOnlineUser.Font, FontStyle.Bold);
-                groupItem.Tag = "GROUP";
-                lvOnlineUser.Items.Add(groupItem);
+                // Kiểm tra xem nhóm đã có trên ListView chưa, tránh Add trùng lặp khi Update
+                bool exists = false;
+                foreach (ListViewItem item in lvOnlineUser.Items)
+                {
+                    if (item.Text == groupName && item.Tag?.ToString() == "GROUP")
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (!exists)
+                {
+                    ListViewItem groupItem = new ListViewItem(groupName);
+                    groupItem.ForeColor = Color.Blue;
+                    groupItem.Font = new Font(lvOnlineUser.Font, FontStyle.Bold);
+                    groupItem.Tag = "GROUP";
+                    lvOnlineUser.Items.Add(groupItem);
+                }
             }));
         }
 
@@ -350,7 +384,19 @@ namespace CLIENT.View
 
         private void btnSelectionChatBox_Click(object sender, EventArgs e)
         {
-            contextMenuStrip1.Show(btnSelectionChatBox, new Point(0, btnSelectionChatBox.Height));
+            // Kiểm tra xem người dùng có đang chọn một mục trong danh sách và mục đó có phải là Group không
+            bool isGroup = lvOnlineUser.SelectedItems.Count > 0 && lvOnlineUser.SelectedItems[0].Tag?.ToString() == "GROUP";
+
+            if (isGroup)
+            {
+                // Nếu là Group thì hiển thị Context Menu
+                contextMenuStrip1.Show(btnSelectionChatBox, new Point(0, btnSelectionChatBox.Height));
+            }
+            else
+            {
+                // Nếu chat 1-1 thì vô hiệu hóa (hoặc hiện thông báo)
+                MessageBox.Show("Chức năng này chỉ khả dụng khi đang chat trong Nhóm!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
 
         private void btnSendChat_Click(object sender, EventArgs e)
@@ -441,6 +487,71 @@ namespace CLIENT.View
         {
             frmRecord recordForm = new frmRecord();
             recordForm.Show();
+        }
+
+
+
+
+        // Hàm lấy danh sách thành viên hiện tại của một nhóm
+        private List<string> GetCurrentGroupMembers(string groupName)
+        {
+            // Nếu Client đã lưu thông tin nhóm này, trả về bản sao danh sách của nhóm đó
+            if (_groupMembersDict.ContainsKey(groupName))
+            {
+                return new List<string>(_groupMembersDict[groupName]);
+            }
+
+            // Nếu chưa có trả về rỗng
+            return new List<string>();
+        }
+
+        private void thêmThànhViênToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            List<string> allOnlineUsers = new List<string>();
+            foreach (ListViewItem item in lvOnlineUser.Items)
+            {
+                if (item.Tag?.ToString() != "GROUP") allOnlineUsers.Add(item.Text);
+            }
+
+            List<string> currentMembers = GetCurrentGroupMembers(_selectedTargetIP);
+            List<string> usersCanBeAdded = new List<string>();
+
+            // Lọc ra các user CHƯA có trong nhóm
+            foreach (string user in allOnlineUsers)
+            {
+                if (!currentMembers.Contains(user)) usersCanBeAdded.Add(user);
+            }
+
+            if (usersCanBeAdded.Count == 0)
+            {
+                MessageBox.Show("Tất cả những người đang online đều đã có trong nhóm!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Truyền cờ GroupAction.Add
+            using (var frm = new frmAdd_Delete_User(usersCanBeAdded, GroupAction.Add, _selectedTargetIP, _client))
+            {
+                frm.ShowDialog();
+            }
+        }
+
+        private void xoáThànhViênToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            List<string> currentMembers = GetCurrentGroupMembers(_selectedTargetIP);
+            string myUsername = this.Text.Replace("CLIENT - ", "").Trim();
+            currentMembers.Remove(myUsername); // Không cho tự xoá chính mình
+
+            if (currentMembers.Count == 0)
+            {
+                MessageBox.Show("Nhóm không có thành viên nào khác để xoá!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Truyền cờ GroupAction.Delete
+            using (var frm = new frmAdd_Delete_User(currentMembers, GroupAction.Delete, _selectedTargetIP, _client))
+            {
+                frm.ShowDialog();
+            }
         }
     }
 }

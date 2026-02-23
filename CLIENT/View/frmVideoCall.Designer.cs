@@ -30,14 +30,13 @@
         {
             components = new System.ComponentModel.Container();
             tableLayoutPanel1 = new TableLayoutPanel();
-            btnSelectionVideoCall = new Button();
+            btnExit = new Button();
             contextMenuStrip1 = new ContextMenuStrip(components);
             mờiThamGiaToolStripMenuItem = new ToolStripMenuItem();
             thoátToolStripMenuItem = new ToolStripMenuItem();
             btnCamera = new Button();
             btnMicrophone = new Button();
             btnRecord = new Button();
-            contextMenuStrip1.SuspendLayout();
             SuspendLayout();
             // 
             // tableLayoutPanel1
@@ -54,36 +53,32 @@
             tableLayoutPanel1.Size = new Size(1081, 607);
             tableLayoutPanel1.TabIndex = 0;
             // 
-            // btnSelectionVideoCall
+            // btnExit
             // 
-            btnSelectionVideoCall.BackColor = Color.Gainsboro;
-            btnSelectionVideoCall.Location = new Point(12, 12);
-            btnSelectionVideoCall.Name = "btnSelectionVideoCall";
-            btnSelectionVideoCall.Size = new Size(77, 43);
-            btnSelectionVideoCall.TabIndex = 1;
-            btnSelectionVideoCall.Text = "Chọn";
-            btnSelectionVideoCall.UseVisualStyleBackColor = false;
-            btnSelectionVideoCall.Click += btnSelectionVideoCall_Click;
+            btnExit.BackColor = Color.Gainsboro;
+            btnExit.Location = new Point(12, 12);
+            btnExit.Name = "btnExit";
+            btnExit.Size = new Size(77, 43);
+            btnExit.TabIndex = 1;
+            btnExit.Text = "Thoát";
+            btnExit.UseVisualStyleBackColor = false;
+            btnExit.Click += btnExit_Click;
             // 
             // contextMenuStrip1
             // 
             contextMenuStrip1.ImageScalingSize = new Size(20, 20);
-            contextMenuStrip1.Items.AddRange(new ToolStripItem[] { mờiThamGiaToolStripMenuItem, thoátToolStripMenuItem });
             contextMenuStrip1.Name = "contextMenuStrip1";
-            contextMenuStrip1.Size = new Size(168, 52);
+            contextMenuStrip1.Size = new Size(61, 4);
             // 
             // mờiThamGiaToolStripMenuItem
             // 
             mờiThamGiaToolStripMenuItem.Name = "mờiThamGiaToolStripMenuItem";
-            mờiThamGiaToolStripMenuItem.Size = new Size(167, 24);
-            mờiThamGiaToolStripMenuItem.Text = "Mời tham gia";
+            mờiThamGiaToolStripMenuItem.Size = new Size(32, 19);
             // 
             // thoátToolStripMenuItem
             // 
             thoátToolStripMenuItem.Name = "thoátToolStripMenuItem";
-            thoátToolStripMenuItem.Size = new Size(167, 24);
-            thoátToolStripMenuItem.Text = "Thoát";
-            thoátToolStripMenuItem.Click += thoátToolStripMenuItem_Click;
+            thoátToolStripMenuItem.Size = new Size(32, 19);
             // 
             // btnCamera
             // 
@@ -126,19 +121,18 @@
             Controls.Add(btnRecord);
             Controls.Add(btnMicrophone);
             Controls.Add(btnCamera);
-            Controls.Add(btnSelectionVideoCall);
+            Controls.Add(btnExit);
             Controls.Add(tableLayoutPanel1);
             Name = "frmVideoCall";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "CLIENT - Video Call";
-            contextMenuStrip1.ResumeLayout(false);
             ResumeLayout(false);
         }
 
         #endregion
 
         private TableLayoutPanel tableLayoutPanel1;
-        private Button btnSelectionVideoCall;
+        private Button btnExit;
         private ContextMenuStrip contextMenuStrip1;
         private ToolStripMenuItem mờiThamGiaToolStripMenuItem;
         private ToolStripMenuItem thoátToolStripMenuItem;

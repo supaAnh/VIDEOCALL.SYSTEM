@@ -49,7 +49,6 @@
             contextMenuStrip1 = new ContextMenuStrip(components);
             thêmThànhViênToolStripMenuItem = new ToolStripMenuItem();
             xoáThànhViênToolStripMenuItem = new ToolStripMenuItem();
-            xoáCuộcTròChuyệnToolStripMenuItem = new ToolStripMenuItem();
             openFileDialog1 = new OpenFileDialog();
             panelChooseChat.SuspendLayout();
             panelChatBox.SuspendLayout();
@@ -237,27 +236,23 @@
             // contextMenuStrip1
             // 
             contextMenuStrip1.ImageScalingSize = new Size(20, 20);
-            contextMenuStrip1.Items.AddRange(new ToolStripItem[] { thêmThànhViênToolStripMenuItem, xoáThànhViênToolStripMenuItem, xoáCuộcTròChuyệnToolStripMenuItem });
+            contextMenuStrip1.Items.AddRange(new ToolStripItem[] { thêmThànhViênToolStripMenuItem, xoáThànhViênToolStripMenuItem });
             contextMenuStrip1.Name = "contextMenuStrip1";
-            contextMenuStrip1.Size = new Size(213, 76);
+            contextMenuStrip1.Size = new Size(188, 52);
             // 
             // thêmThànhViênToolStripMenuItem
             // 
             thêmThànhViênToolStripMenuItem.Name = "thêmThànhViênToolStripMenuItem";
-            thêmThànhViênToolStripMenuItem.Size = new Size(212, 24);
+            thêmThànhViênToolStripMenuItem.Size = new Size(187, 24);
             thêmThànhViênToolStripMenuItem.Text = "Thêm thành viên";
+            thêmThànhViênToolStripMenuItem.Click += thêmThànhViênToolStripMenuItem_Click;
             // 
             // xoáThànhViênToolStripMenuItem
             // 
             xoáThànhViênToolStripMenuItem.Name = "xoáThànhViênToolStripMenuItem";
-            xoáThànhViênToolStripMenuItem.Size = new Size(212, 24);
+            xoáThànhViênToolStripMenuItem.Size = new Size(187, 24);
             xoáThànhViênToolStripMenuItem.Text = "Xoá thành viên";
-            // 
-            // xoáCuộcTròChuyệnToolStripMenuItem
-            // 
-            xoáCuộcTròChuyệnToolStripMenuItem.Name = "xoáCuộcTròChuyệnToolStripMenuItem";
-            xoáCuộcTròChuyệnToolStripMenuItem.Size = new Size(212, 24);
-            xoáCuộcTròChuyệnToolStripMenuItem.Text = "Xoá cuộc trò chuyện";
+            xoáThànhViênToolStripMenuItem.Click += xoáThànhViênToolStripMenuItem_Click;
             // 
             // openFileDialog1
             // 
@@ -301,11 +296,10 @@
         private ContextMenuStrip contextMenuStrip1;
         private ToolStripMenuItem thêmThànhViênToolStripMenuItem;
         private Button btnSelectionChatBox;
-        private ToolStripMenuItem xoáThànhViênToolStripMenuItem;
-        private ToolStripMenuItem xoáCuộcTròChuyệnToolStripMenuItem;
         private OpenFileDialog openFileDialog1;
         private Button btnSignOut;
         private ColumnHeader columnHeader1;
         private Button btnWatchRecord;
+        private ToolStripMenuItem xoáThànhViênToolStripMenuItem;
     }
 }

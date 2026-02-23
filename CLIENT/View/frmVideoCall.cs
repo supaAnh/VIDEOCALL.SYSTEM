@@ -201,16 +201,10 @@ namespace CLIENT.View
             }));
         }
 
-        private void btnSelectionVideoCall_Click(object sender, EventArgs e)
-        {
-            contextMenuStrip1.Show(btnSelectionVideoCall, new Point(0, btnSelectionVideoCall.Height)); // Hiển thị menu ngay dưới nút
-        }
-
-        private void thoátToolStripMenuItem_Click(object sender, EventArgs e)
+        private void btnExit_Click(object sender, EventArgs e)
         {
             ExitCall();
         }
-
 
 
         //
@@ -473,5 +467,6 @@ namespace CLIENT.View
             });
         }
 
+        
     }
 }

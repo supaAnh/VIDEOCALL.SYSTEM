@@ -363,10 +363,68 @@ public class SocketConnect
                     groupMembersTable[newGroupName] = members;
                 }
 
-                // Thông báo cho tất cả thành viên (dựa trên Username)
-                COMMON.DTO.DataPackage gUpdate = new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.GroupUpdate, Encoding.UTF8.GetBytes(newGroupName));
+                // Gửi Tên Nhóm + Danh sách thành viên
+                string updatePayload = $"{newGroupName}|{string.Join(",", members)}";
+                COMMON.DTO.DataPackage gUpdate = new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.GroupUpdate, Encoding.UTF8.GetBytes(updatePayload));
                 BroadcastToList(members, gUpdate.Pack());
                 break;
+
+            // Thêm xoá thành viên nhóm
+
+            case PackageType.AddGroupMember:
+            case PackageType.RemoveGroupMember:
+                string actionData = Encoding.UTF8.GetString(package.Content);
+                string[] actionParts = actionData.Split('|');
+                if (actionParts.Length >= 2)
+                {
+                    string targetGroup = actionParts[0];
+                    List<string> selectedUsers = actionParts[1].Split(',').ToList();
+
+                    lock (groupMembersTable)
+                    {
+                        if (groupMembersTable.ContainsKey(targetGroup))
+                        {
+                            var currentGroupMembers = groupMembersTable[targetGroup];
+
+                            if (package.Type == PackageType.AddGroupMember)
+                            {
+                                // Thêm những người chưa có trong nhóm
+                                foreach (var u in selectedUsers)
+                                {
+                                    if (!currentGroupMembers.Contains(u)) currentGroupMembers.Add(u);
+                                }
+                            }
+                            else if (package.Type == PackageType.RemoveGroupMember)
+                            {
+                                // Xóa những người được chọn
+                                foreach (var u in selectedUsers)
+                                {
+                                    if (currentGroupMembers.Contains(u)) currentGroupMembers.Remove(u);
+                                }
+                            }
+
+                            // Cập nhật lại list trong bảng server
+                            groupMembersTable[targetGroup] = currentGroupMembers;
+
+                            // THÔNG BÁO CHO TOÀN BỘ THÀNH VIÊN HIỆN TẠI (VÀ CẢ NGƯỜI VỪA BỊ XÓA/VỪA ĐƯỢC THÊM)
+                            // Để họ cập nhật lại danh sách hoặc xóa Group hiển thị
+                            List<string> notifyList = new List<string>(currentGroupMembers);
+
+                            // Nếu là xóa, phải gửi GroupUpdate kèm cho cả người bị xóa để họ biết (hoặc bạn có thể tạo gói tin riêng)
+                            if (package.Type == PackageType.RemoveGroupMember)
+                            {
+                                foreach (var u in selectedUsers) if (!notifyList.Contains(u)) notifyList.Add(u);
+                            }
+
+                            string newPayload = $"{targetGroup}|{string.Join(",", currentGroupMembers)}";
+                            COMMON.DTO.DataPackage updatePkg = new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.GroupUpdate, Encoding.UTF8.GetBytes(newPayload));
+                            BroadcastToList(notifyList, updatePkg.Pack());
+                        }
+                    }
+                }
+                break;
+
+
 
             // 5. Tin nhắn nhóm
             case PackageType.GroupMessage:
@@ -751,6 +809,7 @@ public class SocketConnect
                 }
 
                 SERVER.LogUI.LogViewUI.AddLog($"Đã ngắt kết nối Client: {username}.");
+                BroadcastOnlineList();
             }
             else
             {

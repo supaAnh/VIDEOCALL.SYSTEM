@@ -22,6 +22,7 @@ namespace COMMON.DTO
         Register = 13,      // Loại gói tin đăng ký
         LoginResponse = 14,  // Server trả về kết quả đăng nhập
         SaveRecord = 15,     // Gói tin lưu trữ bản ghi cuộc gọi
+        Notification = 16,     // Gói tin thông báo chung (có thể dùng cho nhiều mục đích khác nhau)
     }
 
     public class DataPackage

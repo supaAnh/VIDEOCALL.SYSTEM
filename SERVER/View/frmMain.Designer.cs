@@ -136,6 +136,7 @@
             btnClientOut.TabIndex = 7;
             btnClientOut.Text = "Xoá Client";
             btnClientOut.UseVisualStyleBackColor = false;
+            btnClientOut.Click += btnClientOut_Click;
             // 
             // btnWatchRecord
             // 
@@ -145,6 +146,7 @@
             btnWatchRecord.TabIndex = 8;
             btnWatchRecord.Text = "Xem lại Record";
             btnWatchRecord.UseVisualStyleBackColor = true;
+            btnWatchRecord.Click += btnWatchRecord_Click;
             // 
             // frmMain
             // 

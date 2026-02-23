@@ -266,19 +266,19 @@ namespace SERVER.Database
         //  --- RECORD VIDEOCALL---
         //
 
+        // 1. CẬP NHẬT LẠI HÀM SaveVideoRecord để lưu FileName
         public void SaveVideoRecord(string senderIP, string receiverIP, string fileName, byte[] videoData)
         {
             try
             {
                 using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
-                    // Lưu chung vào bảng ChatHistory hoặc bảng riêng tùy bạn (Ví dụ dùng ChatHistory)
-                    string query = "INSERT INTO ChatHistory (SenderIP, ReceiverIP, ContentVarbinary, Timestamp) VALUES (@sender, @receiver, @content, @time)";
+                    // Chuyển sang lưu vào bảng VideoRecords riêng biệt để dễ quản lý file
+                    string query = "INSERT INTO VideoRecords (SenderIP, ReceiverIP, FileName, VideoData, Timestamp) VALUES (@sender, @receiver, @filename, @content, @time)";
                     SqlCommand cmd = new SqlCommand(query, conn);
                     cmd.Parameters.AddWithValue("@sender", senderIP);
                     cmd.Parameters.AddWithValue("@receiver", receiverIP);
-
-                    // Lưu file mp4 dưới dạng mảng byte
+                    cmd.Parameters.AddWithValue("@filename", fileName); // Đã thêm lưu tên file
                     cmd.Parameters.AddWithValue("@content", videoData);
                     cmd.Parameters.AddWithValue("@time", DateTime.Now);
 
@@ -288,6 +288,77 @@ namespace SERVER.Database
                 }
             }
             catch (Exception ex) { SERVER.LogUI.LogViewUI.AddLog("Lỗi lưu DB Record: " + ex.Message); }
+        }
+
+        // Lấy danh sách những User đã từng gửi Record
+        public List<string> GetUsersWithRecords()
+        {
+            List<string> users = new List<string>();
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    string query = "SELECT DISTINCT SenderIP FROM VideoRecords";
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    conn.Open();
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            users.Add(reader["SenderIP"].ToString());
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) { SERVER.LogUI.LogViewUI.AddLog("Lỗi lấy danh sách User Record: " + ex.Message); }
+            return users;
+        }
+
+        // Lấy danh sách tên file Record của 1 User cụ thể
+        public List<string> GetRecordsByUser(string username)
+        {
+            List<string> records = new List<string>();
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    string query = "SELECT FileName FROM VideoRecords WHERE SenderIP = @user ORDER BY Timestamp DESC";
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@user", username);
+                    conn.Open();
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            records.Add(reader["FileName"].ToString());
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) { SERVER.LogUI.LogViewUI.AddLog("Lỗi lấy danh sách File Record: " + ex.Message); }
+            return records;
+        }
+
+        // Tải mảng byte[] của Video dựa vào FileName
+        public byte[] GetVideoData(string fileName)
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    string query = "SELECT TOP 1 VideoData FROM VideoRecords WHERE FileName = @filename";
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@filename", fileName);
+                    conn.Open();
+                    object result = cmd.ExecuteScalar();
+                    if (result != null && result != DBNull.Value)
+                    {
+                        return (byte[])result;
+                    }
+                }
+            }
+            catch (Exception ex) { SERVER.LogUI.LogViewUI.AddLog("Lỗi tải Data Video: " + ex.Message); }
+            return null;
         }
 
 

@@ -438,35 +438,39 @@ namespace CLIENT.View
 
         private void UploadRecordToServer(string filePath, string fileName)
         {
-            try
+            // Chạy ngầm để việc đọc và gửi file MP4 dung lượng lớn không làm đơ Form
+            System.Threading.Tasks.Task.Run(() =>
             {
-                if (!File.Exists(filePath)) return;
-                byte[] fileData = File.ReadAllBytes(filePath);
-
-                // Dùng chung cấu trúc FilePackageDTO để gửi
-                var fileDto = new FilePackageDTO
+                try
                 {
-                    FileName = fileName,
-                    FileData = fileData
-                };
+                    if (!System.IO.File.Exists(filePath)) return;
+                    byte[] fileData = System.IO.File.ReadAllBytes(filePath);
 
-                byte[] rawData = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(fileDto);
+                    // Đóng gói tên file và dữ liệu video vào FilePackageDTO
+                    var fileDto = new FilePackageDTO
+                    {
+                        FileName = fileName,
+                        FileData = fileData
+                    };
 
-                // Cần truy cập _client từ _videoCallLogic (bạn có thể đổi _client trong VideoCallProcess thành public, hoặc truyền ngầm)
-                // Giả sử gọi một hàm gửi gói SaveRecord:
-                byte[] targetIPBytes = Encoding.UTF8.GetBytes(_targetIP);
-                byte[] ipLengthBytes = BitConverter.GetBytes(targetIPBytes.Length);
+                    byte[] rawData = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(fileDto);
 
-                // Giải mã giả lập để bọc gói tin
-                byte[] finalPayload = new byte[4 + targetIPBytes.Length + rawData.Length];
-                Buffer.BlockCopy(ipLengthBytes, 0, finalPayload, 0, 4);
-                Buffer.BlockCopy(targetIPBytes, 0, finalPayload, 4, targetIPBytes.Length);
-                Buffer.BlockCopy(rawData, 0, finalPayload, 4 + targetIPBytes.Length, rawData.Length);
+                    byte[] targetIPBytes = Encoding.UTF8.GetBytes(_targetIP);
+                    byte[] ipLengthBytes = BitConverter.GetBytes(targetIPBytes.Length);
 
-                // Lưu ý: Hàm Send ở đây yêu cầu bạn có đối tượng _client. 
-                // Bạn có thể viết thêm 1 hàm public SendRecord(byte[] payload) bên trong VideoCallProcess để gửi.
-            }
-            catch (Exception ex) { MessageBox.Show("Lỗi upload video: " + ex.Message); }
+                    byte[] finalPayload = new byte[4 + targetIPBytes.Length + rawData.Length];
+                    Buffer.BlockCopy(ipLengthBytes, 0, finalPayload, 0, 4);
+                    Buffer.BlockCopy(targetIPBytes, 0, finalPayload, 4, targetIPBytes.Length);
+                    Buffer.BlockCopy(rawData, 0, finalPayload, 4 + targetIPBytes.Length, rawData.Length);
+
+                    // GỌI HÀM GỬI LÊN SERVER
+                    _videoCallLogic.SendRecordToServer(finalPayload);
+                }
+                catch (Exception ex)
+                {
+                    this.Invoke(new Action(() => MessageBox.Show("Lỗi upload video: " + ex.Message)));
+                }
+            });
         }
 
     }

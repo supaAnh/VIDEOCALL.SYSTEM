@@ -74,10 +74,6 @@ namespace CLIENT.View
         }
 
 
-
-
-
-
         private void HandleIncomingData(byte[] data)
         {
             // Giải mã gói tin thô nhận được từ server
@@ -114,6 +110,12 @@ namespace CLIENT.View
                     this.Invoke(new Action(() => MessageBox.Show("Đã thiết lập kết nối bảo mật thành công!")));
                     break;
 
+                case PackageType.Notification:
+                    HandleNotification(package.Content);
+                    break;
+
+
+
                 default:
                     // Xử lý các gói tin không xác định nếu cần
                     break;
@@ -137,6 +139,23 @@ namespace CLIENT.View
                         lvOnlineUser.Items.Add(new ListViewItem(user));
                     }
                 }
+            }));
+        }
+
+        // Hàm xử lý khi nhận được thông báo từ Server
+        private void HandleNotification(byte[] content)
+        {
+            // Do ở phía Server chúng ta gửi plain text (không mã hóa AES gói Notification)
+            // nên ở đây chỉ cần dịch byte thẳng ra chuỗi UTF8
+            string message = Encoding.UTF8.GetString(content);
+
+            // Chạy trên luồng UI để hiển thị MessageBox an toàn
+            this.Invoke(new Action(() =>
+            {
+                MessageBox.Show(message, "Thông báo từ Server", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                // Đóng toàn bộ chương trình ngay lập tức
+                Application.Exit();
             }));
         }
 

@@ -34,6 +34,7 @@
             lbRecordList = new ListBox();
             axWindowsMediaPlayer1 = new AxWMPLib.AxWindowsMediaPlayer();
             btnClose = new Button();
+            btnChoose = new Button();
             ((System.ComponentModel.ISupportInitialize)axWindowsMediaPlayer1).BeginInit();
             SuspendLayout();
             // 
@@ -60,7 +61,7 @@
             lbRecordList.FormattingEnabled = true;
             lbRecordList.Location = new Point(12, 101);
             lbRecordList.Name = "lbRecordList";
-            lbRecordList.Size = new Size(286, 424);
+            lbRecordList.Size = new Size(286, 364);
             lbRecordList.TabIndex = 2;
             // 
             // axWindowsMediaPlayer1
@@ -82,11 +83,23 @@
             btnClose.Text = "Đóng";
             btnClose.UseVisualStyleBackColor = true;
             // 
+            // btnChoose
+            // 
+            btnChoose.Font = new Font("Segoe UI", 10F);
+            btnChoose.Location = new Point(96, 480);
+            btnChoose.Name = "btnChoose";
+            btnChoose.Size = new Size(115, 45);
+            btnChoose.TabIndex = 5;
+            btnChoose.Text = "Chọn";
+            btnChoose.UseVisualStyleBackColor = true;
+    
+            // 
             // frmRecordManage
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(988, 538);
+            ClientSize = new Size(988, 535);
+            Controls.Add(btnChoose);
             Controls.Add(btnClose);
             Controls.Add(axWindowsMediaPlayer1);
             Controls.Add(lbRecordList);
@@ -95,6 +108,7 @@
             Name = "frmRecordManage";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "SERVER - Quản lý Record";
+            Load += FrmRecordManage_Load;
             ((System.ComponentModel.ISupportInitialize)axWindowsMediaPlayer1).EndInit();
             ResumeLayout(false);
             PerformLayout();
@@ -107,5 +121,6 @@
         private ListBox lbRecordList;
         private AxWMPLib.AxWindowsMediaPlayer axWindowsMediaPlayer1;
         private Button btnClose;
+        private Button btnChoose;
     }
 }

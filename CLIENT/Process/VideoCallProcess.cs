@@ -543,10 +543,21 @@ namespace CLIENT.Process
             }
         }
 
+        public void SendRecordToServer(byte[] payload)
+        {
+            try
+            {
+                // Đóng gói thành PackageType.SaveRecord và gửi đi
+                _client.Send(new DataPackage(PackageType.SaveRecord, payload).Pack());
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Lỗi gửi record lên server: " + ex.Message);
+            }
+        }
 
-        
 
-        
+
 
 
 

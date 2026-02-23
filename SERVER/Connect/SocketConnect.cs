@@ -81,6 +81,9 @@ public class SocketConnect
         {
             while (true)
             {
+                // Tránh lỗi nếu server đã bị gán null
+                if (server == null) break;
+
                 Socket client = server.Accept();
 
                 // 1. Gửi Key AES trước
@@ -92,21 +95,31 @@ public class SocketConnect
                 receive.Start(client);
 
                 // 3. Cập nhật UI trên Server
-                string clientIP = client.RemoteEndPoint.ToString();
+                string clientIP = "Unknown";
+                try { clientIP = client.RemoteEndPoint?.ToString(); } catch { }
+
                 LogViewUI.AddClient(clientIP);
                 LogViewUI.AddLog($" [{clientIP}]: đã kết nối");
 
-                // QUAN TRỌNG: Đợi 1 chút để Client khởi tạo Form Main xong
-                // và gọi Broadcast cho TẤT CẢ mọi người trong danh sách
+                // Đợi 1 chút để Client khởi tạo Form Main xong
                 Thread.Sleep(300);
                 BroadcastOnlineList();
             }
         }
+        catch (SocketException ex)
+        {
+            if (ex.SocketErrorCode != SocketError.Interrupted)
+            {
+                LogViewUI.AddLog("Lỗi Socket khi Accept: " + ex.Message);
+            }
+        }
         catch (Exception ex)
         {
-            // Xử lý khi server dừng hoặc lỗi
-            LogViewUI.AddLog("Lỗi trong quá trình Accept: " + ex.Message);
-            BroadcastOnlineList();
+            // Chỉ ghi log nếu server vẫn đang chạy mà gặp sự cố bất ngờ
+            if (server != null)
+            {
+                LogViewUI.AddLog("Lỗi trong quá trình Accept: " + ex.Message);
+            }
         }
     }
 
@@ -135,7 +148,10 @@ public class SocketConnect
         Socket senderSocket = obj as Socket;
         if (senderSocket == null) return;
 
-        // Bộ đệm tích lũy dữ liệu thừa từ lần nhận trước (Xử lý dính gói/cắt gói)
+        // 1. Lấy IP ra trước ngay khi Socket còn đang kết nối để an toàn
+        string clientIP = "Unknown";
+        try { clientIP = senderSocket.RemoteEndPoint?.ToString(); } catch { }
+
         byte[] leftOver = new byte[0];
 
         try
@@ -146,41 +162,32 @@ public class SocketConnect
                 int received = senderSocket.Receive(buffer);
                 if (received == 0) break;
 
-                // 1. Kết hợp dữ liệu dư thừa cũ với dữ liệu vừa nhận được
                 byte[] dataToProcess = new byte[leftOver.Length + received];
                 Buffer.BlockCopy(leftOver, 0, dataToProcess, 0, leftOver.Length);
                 Buffer.BlockCopy(buffer, 0, dataToProcess, leftOver.Length, received);
 
                 int offset = 0;
-                // 2. Vòng lặp tách từng gói tin trong mảng byte tích lũy
-                // Cấu trúc gói: 1 byte Type + 4 byte Length + N byte Content (Tối thiểu 5 byte)
                 while (offset + 5 <= dataToProcess.Length)
                 {
-                    // Đọc độ dài Content từ byte thứ 2 đến thứ 5
                     int payloadLength = BitConverter.ToInt32(dataToProcess, offset + 1);
                     int totalPacketSize = 5 + payloadLength;
 
-                    // Kiểm tra xem đã nhận đủ toàn bộ gói tin chưa
                     if (dataToProcess.Length >= offset + totalPacketSize)
                     {
-                        // Tách đúng một gói tin hoàn chỉnh
                         byte[] packetBytes = new byte[totalPacketSize];
                         Buffer.BlockCopy(dataToProcess, offset, packetBytes, 0, totalPacketSize);
 
-                        // Giải gói và xử lý logic
                         DataPackage package = DataPackage.Unpack(packetBytes);
-                        HandlePackage(senderSocket, package); // Gọi hàm xử lý riêng bên dưới
+                        HandlePackage(senderSocket, package);
 
-                        offset += totalPacketSize; // Di chuyển vị trí đọc sang gói tiếp theo
+                        offset += totalPacketSize;
                     }
                     else
                     {
-                        // Chưa nhận đủ gói tin hoàn chỉnh (bị cắt đôi), thoát vòng lặp để đợi Receive tiếp
                         break;
                     }
                 }
 
-                // 3. Lưu lại phần dữ liệu còn dư (nếu có) vào leftOver cho lần nhận sau
                 int remaining = dataToProcess.Length - offset;
                 leftOver = new byte[remaining];
                 if (remaining > 0)
@@ -191,11 +198,12 @@ public class SocketConnect
         }
         catch (Exception ex)
         {
-            LogViewUI.AddLog($"Client [{senderSocket.RemoteEndPoint}] ngắt kết nối: {ex.Message}");
+            // Bỏ dòng log báo lỗi đỏ ở đây để tránh rác màn hình khi Server kích Client
         }
         finally
         {
-            HandleDisconnect(senderSocket);
+            // 2. Truyền biến clientIP đã lấy được vào HandleDisconnect
+            HandleDisconnect(senderSocket, clientIP);
         }
     }
 
@@ -203,7 +211,6 @@ public class SocketConnect
     //Hàm nhận data từ client
     //
     // Hàm xử lý logic tập trung cho từng gói tin sau khi đã được tách đúng
-    // Sửa lại hàm HandlePackage trong SERVER/Connect/SocketConnect.cs
 
     private void HandlePackage(Socket senderSocket, DataPackage package)
     {
@@ -219,7 +226,7 @@ public class SocketConnect
                 BroadcastOnlineList();
                 break;
 
-            // --- XỬ LÝ ĐĂNG KÝ (MỚI) ---
+            // --- XỬ LÝ ĐĂNG KÝ ---
             case PackageType.Register:
                 if (clientKeys.TryGetValue(senderSocket, out byte[] regKey))
                 {
@@ -557,43 +564,49 @@ public class SocketConnect
     }
 
     // hàm xử lý ngắt kết nối 
-    private void HandleDisconnect(Socket client)
+    private void HandleDisconnect(Socket client, string knownIP)
     {
-        // Lấy IP trước khi đóng socket (dùng try-catch để an toàn)
-        string clientIP = "Unknown";
-        try { clientIP = client.RemoteEndPoint?.ToString(); } catch { }
+        string clientIP = knownIP;
+        if (clientIP == "Unknown")
+        {
+            try { clientIP = client.RemoteEndPoint?.ToString(); } catch { }
+        }
 
-        // Mặc định chuỗi cần xóa là IP (nếu chưa đăng nhập)
         string identityToRemove = clientIP;
+
+        // Dùng cờ này để phân biệt: Client tự thoát HAY đã bị Server kích
+        bool isAlreadyKicked = true;
 
         lock (_socketToUser)
         {
             if (_socketToUser.ContainsKey(client))
             {
                 string uName = _socketToUser[client];
-
-                // Nếu đã đăng nhập, chuỗi trên UI là "IP - Username", ta phải xóa đúng chuỗi này
                 identityToRemove = $"{clientIP} - {uName}";
-
                 _socketToUser.Remove(client);
+                isAlreadyKicked = false; // Vẫn tìm thấy trong danh sách -> Tự thoát
             }
         }
 
         lock (clientKeys)
         {
-            if (clientKeys.ContainsKey(client)) clientKeys.Remove(client);
+            if (clientKeys.ContainsKey(client))
+            {
+                clientKeys.Remove(client);
+                isAlreadyKicked = false; // Vẫn tìm thấy trong danh sách -> Tự thoát
+            }
         }
 
         try { client.Close(); } catch { }
 
-        // Xóa khỏi giao diện Server
-        if (!string.IsNullOrEmpty(identityToRemove))
+        // CHỈ in log và gỡ khỏi giao diện UI nếu Client tự thoát (Chưa bị Kích)
+        if (!isAlreadyKicked && !string.IsNullOrEmpty(identityToRemove) && identityToRemove != "Unknown")
         {
             SERVER.LogUI.LogViewUI.RemoveClient(identityToRemove);
             SERVER.LogUI.LogViewUI.AddLog($"Client [{identityToRemove}] đã ngắt kết nối.");
         }
 
-        // Cập nhật danh sách mới cho các client còn lại
+        // Cập nhật danh sách Online mới nhất cho các Client khác
         BroadcastOnlineList();
     }
 
@@ -633,6 +646,122 @@ public class SocketConnect
     }
 
 
+    //
+    //  --- NGẮT KẾT NỐI ---
+    //
+
+
+
+    // Dừng Server và ngắt tất cả kết nối
+    public void StopServer()
+    {
+        try
+        {
+            // 1. Đóng Socket của tất cả Client đang online
+            lock (_socketToUser)
+            {
+                // Dùng ToList() để tạo bản sao danh sách, tránh lỗi khi đang lặp mà xóa phần tử
+                foreach (var client in _socketToUser.Keys.ToList())
+                {
+                    try { client.Close(); } catch { }
+                }
+                _socketToUser.Clear();
+            }
+
+            lock (clientKeys)
+            {
+                clientKeys.Clear();
+            }
+
+            lock (groupMembersTable)
+            {
+                groupMembersTable.Clear();
+            }
+
+            // 2. Đóng Socket Lắng nghe chính của Server
+            if (server != null)
+            {
+                try { server.Close(); } catch { }
+                server = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            SERVER.LogUI.LogViewUI.AddLog("Lỗi khi đóng Server: " + ex.Message);
+        }
+    }
+
+
+    // Ngắt kết nối một Client cụ thể dựa trên định danh hiển thị
+    public void DisconnectClient(string displayIdentity)
+    {
+        try
+        {
+            Socket clientToDisconnect = null;
+            string username = "";
+
+            // 1. Tìm Socket của Client sao cho khớp với định dạng "IP - Username" hoặc "IP"
+            lock (_socketToUser)
+            {
+                foreach (var pair in _socketToUser)
+                {
+                    string ip = "";
+                    try { ip = pair.Key.RemoteEndPoint?.ToString(); } catch { }
+
+                    // Khớp với trường hợp đã đăng nhập "IP - Username" hoặc chưa đăng nhập "IP"
+                    if (displayIdentity == $"{ip} - {pair.Value}" || displayIdentity == ip)
+                    {
+                        clientToDisconnect = pair.Key;
+                        username = pair.Value; // Lấy đúng username để thông báo
+                        break;
+                    }
+                }
+            }
+
+            if (clientToDisconnect != null)
+            {
+                // 2. Gửi thông báo cho Client biết họ đã bị Server ngắt kết nối
+                string message = $"SERVER đã ngắt kết nối của {username}";
+                byte[] payload = System.Text.Encoding.UTF8.GetBytes(message);
+
+                try
+                {
+                    // Gửi thông báo
+                    clientToDisconnect.Send(new DataPackage(PackageType.Notification, payload).Pack());
+
+                    // Đợi một chút để gói tin kịp truyền đi qua mạng trước khi Socket bị đóng sập
+                    System.Threading.Thread.Sleep(200);
+                }
+                catch { /* Bỏ qua lỗi nếu client đã rớt mạng từ trước */ }
+
+                // 3. Đóng Socket và dọn dẹp khỏi các danh sách quản lý
+                try { clientToDisconnect.Close(); } catch { }
+
+                lock (_socketToUser)
+                {
+                    _socketToUser.Remove(clientToDisconnect);
+                }
+
+                lock (clientKeys)
+                {
+                    if (clientKeys.ContainsKey(clientToDisconnect))
+                    {
+                        clientKeys.Remove(clientToDisconnect);
+                    }
+                }
+
+                SERVER.LogUI.LogViewUI.AddLog($"Đã ngắt kết nối Client: {username}.");
+            }
+            else
+            {
+                SERVER.LogUI.LogViewUI.AddLog($"Không tìm thấy dữ liệu Socket cho: {displayIdentity}");
+            }
+        }
+        catch (Exception ex)
+        {
+            SERVER.LogUI.LogViewUI.AddLog("Lỗi khi kích Client: " + ex.Message);
+        }
+    }
 
 
 

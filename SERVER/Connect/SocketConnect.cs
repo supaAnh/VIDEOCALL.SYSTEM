@@ -386,6 +386,9 @@ public class SocketConnect
                         {
                             var currentGroupMembers = groupMembersTable[targetGroup];
 
+                            // Chuỗi lưu trữ thông báo hệ thống
+                            string systemMsg = "";
+
                             if (package.Type == PackageType.AddGroupMember)
                             {
                                 // Thêm những người chưa có trong nhóm
@@ -393,6 +396,7 @@ public class SocketConnect
                                 {
                                     if (!currentGroupMembers.Contains(u)) currentGroupMembers.Add(u);
                                 }
+                                systemMsg = $"Đã thêm {string.Join(", ", selectedUsers)} vào nhóm.";
                             }
                             else if (package.Type == PackageType.RemoveGroupMember)
                             {
@@ -401,6 +405,7 @@ public class SocketConnect
                                 {
                                     if (currentGroupMembers.Contains(u)) currentGroupMembers.Remove(u);
                                 }
+                                systemMsg = $"Đã xoá {string.Join(", ", selectedUsers)} khỏi nhóm.";
                             }
 
                             // Cập nhật lại list trong bảng server
@@ -419,6 +424,12 @@ public class SocketConnect
                             string newPayload = $"{targetGroup}|{string.Join(",", currentGroupMembers)}";
                             COMMON.DTO.DataPackage updatePkg = new COMMON.DTO.DataPackage(COMMON.DTO.PackageType.GroupUpdate, Encoding.UTF8.GetBytes(newPayload));
                             BroadcastToList(notifyList, updatePkg.Pack());
+
+                            // GỬI TIN NHẮN HỆ THỐNG VÀO BOX CHAT CỦA NHÓM
+                            string forwardData = $"{targetGroup}|Hệ thống|{systemMsg}";
+                            db.SaveGroupMessage("Hệ thống", targetGroup, systemMsg);
+                            // Truyền null vào tham số sender để tin nhắn gửi đến tất cả mọi người, kể cả người thao tác
+                            BroadcastToGroup(notifyList, forwardData, null);
                         }
                     }
                 }
@@ -481,54 +492,115 @@ public class SocketConnect
             case PackageType.VideoCall:
                 {
                     string vData = Encoding.UTF8.GetString(package.Content);
-                    // Payload: [TargetUser]|[Action]|[Data]
+                    // Payload: [TargetUser/Group]|[Action]|[Data]
                     if (!vData.Contains("|")) break;
 
                     string[] vParts = vData.Split('|');
-                    string vTarget = vParts[0];
+                    string vTarget = vParts[0]; // Có thể là Username hoặc Tên Nhóm
                     string vAction = vParts[1];
                     string vRawPayload = vParts.Length >= 3 ? vParts[2] : "";
 
-                    // Giải mã dữ liệu video từ khóa người gửi và mã hóa lại bằng khóa người nhận
-                    if (!string.IsNullOrEmpty(vRawPayload) && (vAction == "Frame" || vAction == "Audio"))
+                    // Kiểm tra xem vTarget có phải là một nhóm hay không
+                    bool isGroup = false;
+                    List<string> groupMembers = null;
+                    lock (groupMembersTable)
                     {
-                        // Đổi tên biến thành vSenderKey để tránh lỗi trùng scope với SecureMessage
-                        if (clientKeys.TryGetValue(senderSocket, out byte[] vSenderKey))
+                        if (groupMembersTable.ContainsKey(vTarget))
                         {
-                            try
-                            {
-                                byte[] rawEncrypted = Convert.FromBase64String(vRawPayload);
-                                byte[] decryptedVideo = COMMON.Security.AES_Service.Decrypt(rawEncrypted, vSenderKey);
-
-                                // Tìm khóa của người nhận
-                                byte[] targetKey = null;
-                                lock (_socketToUser)
-                                {
-                                    foreach (var pair in _socketToUser)
-                                    {
-                                        if (pair.Value == vTarget && pair.Key.Connected)
-                                        {
-                                            if (clientKeys.TryGetValue(pair.Key, out targetKey))
-                                                break;
-                                        }
-                                    }
-                                }
-
-                                if (targetKey != null)
-                                {
-                                    byte[] reEncryptedVideo = COMMON.Security.AES_Service.Encrypt(decryptedVideo, targetKey);
-                                    vRawPayload = Convert.ToBase64String(reEncryptedVideo);
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                SERVER.LogUI.LogViewUI.AddLog($"Lỗi định tuyến VideoCall: {ex.Message}");
-                            }
+                            isGroup = true;
+                            groupMembers = new List<string>(groupMembersTable[vTarget]);
                         }
                     }
 
-                    // ForwardToClient sẽ đóng gói và mã hóa lớp vỏ bảo vệ bên ngoài
-                    ForwardToClient(vTarget, senderIdentity, $"{vAction}|{vRawPayload}", COMMON.DTO.PackageType.VideoCall);
+                    if (isGroup)
+                    {
+                        // ----- XỬ LÝ GỌI NHÓM -----
+                        if (clientKeys.TryGetValue(senderSocket, out byte[] vSenderKey))
+                        {
+                            byte[] decryptedVideo = null;
+                            // 1. Giải mã Frame/Audio nếu có để chuẩn bị mã hóa lại cho từng thành viên
+                            if (!string.IsNullOrEmpty(vRawPayload) && (vAction == "Frame" || vAction == "Audio"))
+                            {
+                                try
+                                {
+                                    byte[] rawEncrypted = Convert.FromBase64String(vRawPayload);
+                                    decryptedVideo = COMMON.Security.AES_Service.Decrypt(rawEncrypted, vSenderKey);
+                                }
+                                catch (Exception ex) { SERVER.LogUI.LogViewUI.AddLog($"Lỗi giải mã Video Nhóm: {ex.Message}"); }
+                            }
+
+                            // 2. Broadcast cho tất cả thành viên (Trừ người gửi)
+                            lock (_socketToUser)
+                            {
+                                foreach (var pair in _socketToUser)
+                                {
+                                    if (groupMembers.Contains(pair.Value) && pair.Key.Connected && pair.Key != senderSocket)
+                                    {
+                                        if (clientKeys.TryGetValue(pair.Key, out byte[] targetKey))
+                                        {
+                                            string payloadToSend = vRawPayload;
+
+                                            if (decryptedVideo != null)
+                                            {
+                                                try
+                                                {
+                                                    byte[] reEncryptedVideo = COMMON.Security.AES_Service.Encrypt(decryptedVideo, targetKey);
+                                                    payloadToSend = Convert.ToBase64String(reEncryptedVideo);
+                                                }
+                                                catch { continue; }
+                                            }
+
+                                            // Đóng gói 4 phần: TênNhóm | Action | NgườiGửiThựcSự | Payload
+                                            string dataToSend = $"{vTarget}|{vAction}|{senderIdentity}|{payloadToSend}";
+                                            byte[] enc = AES_Service.EncryptString(dataToSend, targetKey);
+                                            pair.Key.Send(new DataPackage(COMMON.DTO.PackageType.VideoCall, enc).Pack());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // ----- XỬ LÝ GỌI 1-1 (Logic nguyên bản) -----
+                        if (!string.IsNullOrEmpty(vRawPayload) && (vAction == "Frame" || vAction == "Audio"))
+                        {
+                            if (clientKeys.TryGetValue(senderSocket, out byte[] vSenderKey))
+                            {
+                                try
+                                {
+                                    byte[] rawEncrypted = Convert.FromBase64String(vRawPayload);
+                                    byte[] decryptedVideo = COMMON.Security.AES_Service.Decrypt(rawEncrypted, vSenderKey);
+
+                                    byte[] targetKey = null;
+                                    lock (_socketToUser)
+                                    {
+                                        foreach (var pair in _socketToUser)
+                                        {
+                                            if (pair.Value == vTarget && pair.Key.Connected)
+                                            {
+                                                if (clientKeys.TryGetValue(pair.Key, out targetKey))
+                                                    break;
+                                            }
+                                        }
+                                    }
+
+                                    if (targetKey != null)
+                                    {
+                                        byte[] reEncryptedVideo = COMMON.Security.AES_Service.Encrypt(decryptedVideo, targetKey);
+                                        vRawPayload = Convert.ToBase64String(reEncryptedVideo);
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    SERVER.LogUI.LogViewUI.AddLog($"Lỗi định tuyến VideoCall: {ex.Message}");
+                                }
+                            }
+                        }
+
+                        // ForwardToClient tự động kẹp senderIdentity vào, nên Client 1-1 sẽ nhận 3 phần
+                        ForwardToClient(vTarget, senderIdentity, $"{vAction}|{vRawPayload}", COMMON.DTO.PackageType.VideoCall);
+                    }
                 }
                 break;
 
@@ -612,7 +684,19 @@ public class SocketConnect
         {
             foreach (var item in clientKeys)
             {
-                if (members.Contains(item.Key.RemoteEndPoint.ToString()) && item.Key.Connected && item.Key != sender)
+                string clientIdentity = "";
+                // Lấy định danh thực sự của Client (Username nếu đã đăng nhập, ngược lại là IP)
+                if (_socketToUser.ContainsKey(item.Key))
+                {
+                    clientIdentity = _socketToUser[item.Key];
+                }
+                else
+                {
+                    try { clientIdentity = item.Key.RemoteEndPoint.ToString(); } catch { }
+                }
+
+                // Kiểm tra xem định danh có nằm trong nhóm không
+                if (members.Contains(clientIdentity) && item.Key.Connected && item.Key != sender)
                 {
                     byte[] enc = AES_Service.EncryptString(rawData, item.Value);
                     item.Key.Send(new DataPackage(PackageType.GroupMessage, enc).Pack());

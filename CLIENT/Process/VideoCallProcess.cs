@@ -37,7 +37,7 @@ namespace CLIENT.Process
         {
             _client = client;
 
-            // QUAN TRỌNG: Đăng ký nhận dữ liệu từ Socket ngay khi khởi tạo
+            // Đăng ký nhận dữ liệu từ Socket ngay khi khởi tạo
             _client.OnRawDataReceived += Client_OnRawDataReceived;
         }
 
@@ -52,18 +52,28 @@ namespace CLIENT.Process
                 // 2. Chỉ xử lý nếu là gói tin VideoCall
                 if (package.Type == PackageType.VideoCall)
                 {
-                    // 3. Tách payload: TargetIP|Action|Base64Data. CẦN GIẢI MÃ BẰNG KHÓA AES TRƯỚC
+                    // 3. Tách payload. CẦN GIẢI MÃ BẰNG KHÓA AES TRƯỚC
                     string rawContent = COMMON.Security.AES_Service.DecryptString(package.Content, _client.AesKey);
                     string[] parts = rawContent.Split('|');
 
                     if (parts.Length >= 3)
                     {
-                        string senderIP = parts[0];
-                        string action = parts[1]; // "Frame" hoặc "Audio"
-                        string payload = parts[2]; // Dữ liệu mã hóa Base64
+                        string targetOrSender = parts[0];
+                        string action = parts[1]; // "Frame", "Audio", "Leave", v.v.
+                        string payload = parts[2];
 
-                        // Gọi hàm xử lý chi tiết
-                        ProcessIncomingVideoData(senderIP, action, payload);
+                        string actualSender = targetOrSender;
+                        string actualPayload = payload;
+
+                        // Nếu là cuộc gọi Nhóm, mảng sẽ có 4 phần (TênNhóm | Action | NgườiGửiThựcSự | Payload)
+                        if (parts.Length >= 4)
+                        {
+                            actualSender = parts[2]; // Lấy danh tính người gửi
+                            actualPayload = parts[3]; // Dữ liệu mã hóa Base64
+                        }
+
+                        // Gọi hàm xử lý chi tiết với tên người gửi chính xác
+                        ProcessIncomingVideoData(actualSender, action, actualPayload);
                     }
                 }
             }

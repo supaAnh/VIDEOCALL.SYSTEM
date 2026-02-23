@@ -73,8 +73,8 @@ namespace CLIENT.View
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            // Gửi gói tin thông báo ngắt kết nối đến server trước khi đóng form
-            Application.Exit();
+            // Gửi gói tin thông báo đăng xuất cho Server trước khi đóng
+            Environment.Exit(0);
         }
 
 
@@ -163,8 +163,7 @@ namespace CLIENT.View
             }));
         }
 
-        // CLIENT/View/frmMain.cs
-
+        // Hàm xử lý khi nhận được cập nhật về nhóm (tên nhóm + danh sách thành viên)
         private void HandleGroupUpdate(byte[] content)
         {
             string payload = Encoding.UTF8.GetString(content);
@@ -176,32 +175,72 @@ namespace CLIENT.View
             string groupName = parts[0];
 
             // Lưu/Cập nhật danh sách thành viên vào Dictionary của Client
-            if (parts.Length >= 2)
+            List<string> members = new List<string>();
+            if (parts.Length >= 2 && !string.IsNullOrEmpty(parts[1]))
             {
-                List<string> members = parts[1].Split(',').ToList();
-                _groupMembersDict[groupName] = members;
+                members = parts[1].Split(',').ToList();
             }
+
+            // Lấy Username của chính mình từ Tiêu đề Form
+            string myUsername = this.Text.Replace("CLIENT - ", "").Trim();
 
             this.Invoke(new Action(() =>
             {
-                // Kiểm tra xem nhóm đã có trên ListView chưa, tránh Add trùng lặp khi Update
-                bool exists = false;
-                foreach (ListViewItem item in lvOnlineUser.Items)
+                // Nếu Client KHÔNG CÒN nằm trong danh sách thành viên
+                if (!members.Contains(myUsername))
                 {
-                    if (item.Text == groupName && item.Tag?.ToString() == "GROUP")
+                    // 1. Xóa khỏi Dictionary lưu trữ của Client
+                    if (_groupMembersDict.ContainsKey(groupName))
                     {
-                        exists = true;
-                        break;
+                        _groupMembersDict.Remove(groupName);
                     }
-                }
 
-                if (!exists)
+                    // 2. Xóa khỏi ListView hiển thị
+                    foreach (ListViewItem item in lvOnlineUser.Items)
+                    {
+                        if (item.Text == groupName && item.Tag?.ToString() == "GROUP")
+                        {
+                            lvOnlineUser.Items.Remove(item);
+                            break;
+                        }
+                    }
+
+                    // 3. Nếu Client đang mở chính box chat của nhóm này thì reset lại
+                    if (_selectedTargetIP == groupName)
+                    {
+                        _selectedTargetIP = "";
+                        lbTargetName.Text = "Chưa chọn";
+                        txtChatBox.Clear();
+                        txtChatBox.Visible = false;
+                    }
+
+                    // 4. Hiển thị thông báo bị xoá
+                    MessageBox.Show($"Bạn đã bị xoá khỏi nhóm {groupName}.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
                 {
-                    ListViewItem groupItem = new ListViewItem(groupName);
-                    groupItem.ForeColor = Color.Blue;
-                    groupItem.Font = new Font(lvOnlineUser.Font, FontStyle.Bold);
-                    groupItem.Tag = "GROUP";
-                    lvOnlineUser.Items.Add(groupItem);
+                    // Nếu Client VẪN CÒN trong nhóm (Được thêm vào hoặc nhóm mới tạo)
+                    _groupMembersDict[groupName] = members;
+
+                    // Kiểm tra xem nhóm đã có trên ListView chưa, tránh Add trùng lặp khi Update
+                    bool exists = false;
+                    foreach (ListViewItem item in lvOnlineUser.Items)
+                    {
+                        if (item.Text == groupName && item.Tag?.ToString() == "GROUP")
+                        {
+                            exists = true;
+                            break;
+                        }
+                    }
+
+                    if (!exists)
+                    {
+                        ListViewItem groupItem = new ListViewItem(groupName);
+                        groupItem.ForeColor = Color.Blue;
+                        groupItem.Font = new Font(lvOnlineUser.Font, FontStyle.Bold);
+                        groupItem.Tag = "GROUP";
+                        lvOnlineUser.Items.Add(groupItem);
+                    }
                 }
             }));
         }
@@ -279,51 +318,80 @@ namespace CLIENT.View
 
         private void HandleVideoCall(byte[] content)
         {
-            // Cần giải mã nội dung gói tin trước khi đọc bằng khóa AES
+            // Giải mã nội dung gói tin trước khi đọc bằng khóa AES
             string rawSignal = COMMON.Security.AES_Service.DecryptString(content, _client.AesKey);
             string[] parts = rawSignal.Split('|');
 
-            // Cấu trúc nhận được: [SenderIP]|[Status]|[Payload]
+            // Cấu trúc nhận được có thể là:
+            // Gọi 1-1: [SenderIP]|[Status]|[Payload]
+            // Gọi Nhóm: [TênNhóm]|[Status]|[ActualSender]|[Payload]
             if (parts.Length < 2) return;
 
-            string senderIP = parts[0];
+            string targetOrSender = parts[0];
             string status = parts[1];
+
+            // Mặc định cho 1-1
+            string actualSender = targetOrSender;
             string payload = parts.Length >= 3 ? parts[2] : "";
+
+            // Nếu là gọi Nhóm (4 phần), ghi đè lại actualSender
+            if (parts.Length >= 4)
+            {
+                actualSender = parts[2];
+                payload = parts[3];
+            }
 
             this.Invoke(new Action(() =>
             {
+                // Tìm xem có form Video Call nào đang mở không
+                var activeCallForm = Application.OpenForms.OfType<frmVideoCall>().FirstOrDefault();
+
                 switch (status)
                 {
                     case "Request":
-                        var res = MessageBox.Show($"Cuộc gọi video từ {senderIP}. Đồng ý?",
-                                  "Video Call", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-                        if (res == DialogResult.Yes)
+                        // TÍNH NĂNG JOIN GIỮA CHỪNG
+                        if (activeCallForm != null)
                         {
-                            using (frmSelectOption sd = new frmSelectOption())
-                            {
-                                if (sd.ShowDialog() == DialogResult.OK)
-                                {
-                                    // Gửi tín hiệu chấp nhận
-                                    _videoCallLogic.SendVideoCallSignal(senderIP, "Accept");
-
-                                    // TRUYỀN THÊM sd.IsCameraOn, sd.IsMicOn
-                                    frmVideoCall activeCallForm = new frmVideoCall(
-                                        senderIP,
-                                        sd.SelectedMoniker,
-                                        _videoCallLogic,
-                                        sd.IsCameraOn,
-                                        sd.IsMicOn
-                                    );
-
-                                    activeCallForm.Show();
-                                }
-                                else { _videoCallLogic.SendVideoCallSignal(senderIP, "Refuse"); }
-                            }
+                            // Nếu đang trong cuộc gọi, tự động gửi Accept cho người mới và thêm vào giao diện
+                            _videoCallLogic.SendVideoCallSignal(actualSender, "Accept");
+                            activeCallForm.AddParticipant(actualSender);
                         }
                         else
                         {
-                            _videoCallLogic.SendVideoCallSignal(senderIP, "Refuse");
+                            // Nếu chưa có cuộc gọi, hiển thị hộp thoại xác nhận bình thường
+                            string displayCaller = (targetOrSender != actualSender) ? $"{targetOrSender} (từ {actualSender})" : actualSender;
+                            var res = MessageBox.Show($"Cuộc gọi video từ {displayCaller}. Đồng ý?",
+                                      "Video Call", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                            if (res == DialogResult.Yes)
+                            {
+                                using (frmSelectOption sd = new frmSelectOption())
+                                {
+                                    if (sd.ShowDialog() == DialogResult.OK)
+                                    {
+                                        // Gửi tín hiệu chấp nhận 1-1 trực tiếp tới người gọi
+                                        _videoCallLogic.SendVideoCallSignal(actualSender, "Accept");
+
+                                        // Mở form video call, targetOrSender giữ nguyên để biết là gửi frame vào Group hay User
+                                        frmVideoCall callForm = new frmVideoCall(
+                                            targetOrSender,
+                                            sd.SelectedMoniker,
+                                            _videoCallLogic,
+                                            sd.IsCameraOn,
+                                            sd.IsMicOn
+                                        );
+
+                                        // Thêm định danh THẬT của người gọi vào UI
+                                        callForm.AddParticipant(actualSender);
+                                        callForm.Show();
+                                    }
+                                    else { _videoCallLogic.SendVideoCallSignal(actualSender, "Refuse"); }
+                                }
+                            }
+                            else
+                            {
+                                _videoCallLogic.SendVideoCallSignal(actualSender, "Refuse");
+                            }
                         }
                         break;
 
@@ -333,21 +401,23 @@ namespace CLIENT.View
                         break;
 
                     case "Accept":
-                        var callForm = Application.OpenForms.OfType<frmVideoCall>().FirstOrDefault();
-                        if (callForm != null)
+                        if (activeCallForm != null)
                         {
-                            // Chỉ thêm người dùng vào giao diện
-                            callForm.AddParticipant(senderIP);
+                            // Dùng actualSender thay vì Tên Nhóm
+                            activeCallForm.AddParticipant(actualSender);
                         }
                         break;
 
                     case "Refuse":
-                        MessageBox.Show($"[{senderIP}] từ chối cuộc gọi.");
+                        // Chỉ hiển thị thông báo từ chối nếu gọi 1-1 để tránh phiền trong Group
+                        if (targetOrSender == actualSender)
+                        {
+                            MessageBox.Show($"[{actualSender}] từ chối cuộc gọi.");
+                        }
                         break;
 
                     case "RecordStart":
-                        // Hiển thị thông báo khi có người nhấn nút Record
-                        MessageBox.Show($"[{senderIP}] đang ghi hình cuộc gọi này!", "Thông báo bảo mật", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show($"[{actualSender}] đang ghi hình cuộc gọi này!", "Thông báo bảo mật", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         break;
                 }
             }));
@@ -552,6 +622,21 @@ namespace CLIENT.View
             {
                 frm.ShowDialog();
             }
+        }
+
+        private void btnSignOut_Click(object sender, EventArgs e)
+        {
+            DialogResult result = MessageBox.Show("Bạn có chắc chắn muốn đăng xuất tài khoản hiện tại?", "Xác nhận đăng xuất", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                // Khởi động lại ứng dụng 
+                System.Diagnostics.Process.Start(Application.ExecutablePath);
+
+                // Đảm bảo thoát hoàn toàn phiên bản cũ để tránh rò rỉ tài nguyên hoặc kết nối
+                Environment.Exit(0);
+            }
+
         }
     }
 }

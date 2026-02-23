@@ -111,6 +111,7 @@
             btnSignOut.TabIndex = 5;
             btnSignOut.Text = "Đăng xuất";
             btnSignOut.UseVisualStyleBackColor = true;
+            btnSignOut.Click += btnSignOut_Click;
             // 
             // btnCreateGroupChat
             // 

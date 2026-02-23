@@ -13,24 +13,35 @@ namespace CLIENT.View
 {
     public partial class frmVideoCall : Form
     {
+        // IP của đối tác đang gọi đến hoặc gọi đi, được truyền vào từ bên ngoài để dễ dàng quản lý và gửi tín hiệu
         private string _targetIP;
 
+        // Moniker của chính mình, thường là tên người dùng hoặc IP, được truyền vào từ bên ngoài để dễ dàng quản lý và hiển thị
         public string myMoniker { get; private set; }
 
+        // Logic xử lý cuộc gọi video, được truyền vào từ bên ngoài để tách biệt rõ ràng giữa UI và Network
         private CLIENT.Process.VideoCallProcess _videoCallLogic;
 
+        // Quản lý các PictureBox hiển thị video của từng người tham gia, key là participantID (thường là IP hoặc Moniker)
         private Dictionary<string, PictureBox> _participantVideos = new Dictionary<string, PictureBox>();
 
+
+        // Audio Playback
         private WaveOutEvent _waveOut;
         private BufferedWaveProvider _waveProvider;
 
+        // Trạng thái Camera và Microphone
         private bool _isCamOn;
         private bool _isMicOn;
 
+        // Ghi hình cuộc gọi
         private System.Windows.Forms.Timer _recordTimer;
         private bool _isRecordingForm = false;
         private string _currentRecordPath = "";
         private ClientSocketConnect _clientSocket; // gửi tín hiệu kết thúc ghi âm
+
+        // Dùng để theo dõi những người đã rời đi, tránh việc thêm lại vào giao diện nếu họ vô tình gửi khung hình sau khi đã rời
+        private HashSet<string> _leftParticipants = new HashSet<string>();
 
 
         public frmVideoCall(string targetIP, string moniker, CLIENT.Process.VideoCallProcess videoLogic, bool isCamOn, bool isMicOn)
@@ -69,13 +80,19 @@ namespace CLIENT.View
         //
         public void AddParticipant(string participantID)
         {
-            if (_participantVideos.ContainsKey(participantID)) return;
-
             if (this.InvokeRequired)
             {
                 this.Invoke(new Action(() => AddParticipant(participantID)));
                 return;
             }
+
+            // Xóa khỏi danh sách chặn nếu người này thực sự gọi/join lại
+            if (_leftParticipants.Contains(participantID))
+            {
+                _leftParticipants.Remove(participantID);
+            }
+
+            if (_participantVideos.ContainsKey(participantID)) return;
 
             PictureBox pb = new PictureBox
             {
@@ -84,6 +101,19 @@ namespace CLIENT.View
                 BorderStyle = BorderStyle.FixedSingle,
                 Dock = DockStyle.Fill
             };
+
+            // TẠO COMPONENT LABEL BẰNG CODE ĐỂ ĐỊNH DANH
+            Label lblUserName = new Label
+            {
+                Text = participantID,
+                AutoSize = true,
+                BackColor = Color.FromArgb(128, 0, 0, 0), // Nền đen mờ
+                ForeColor = Color.White,                  // Chữ trắng
+                Font = new Font("Arial", 12, FontStyle.Bold),
+                Location = new Point(5, 5),
+                Padding = new Padding(2)
+            };
+            pb.Controls.Add(lblUserName);
 
             _participantVideos.Add(participantID, pb);
 
@@ -168,6 +198,7 @@ namespace CLIENT.View
             }
         }
 
+        // Khởi tạo hệ thống phát âm thanh
         private void InitAudioPlayback()
         {
             try
@@ -186,6 +217,7 @@ namespace CLIENT.View
             }
         }
 
+        // Xử lý khi nhận được khung hình video mới
         private void OnFrameReceivedHandler(string senderIP, Bitmap bmp)
         {
             if (this.IsDisposed) return;
@@ -193,6 +225,13 @@ namespace CLIENT.View
             // Invoke an toàn
             this.BeginInvoke(new Action(() =>
             {
+                // Nếu user đã rời phòng thì huỷ bỏ ngay các khung hình đến trễ
+                if (_leftParticipants.Contains(senderIP))
+                {
+                    bmp?.Dispose();
+                    return;
+                }
+
                 if (!_participantVideos.ContainsKey(senderIP))
                 {
                     AddParticipant(senderIP);
@@ -232,6 +271,9 @@ namespace CLIENT.View
                 this.BeginInvoke(new Action(() => RemoveParticipant(participantID)));
                 return;
             }
+
+            // Đưa người này vào danh sách chặn để block các Frame delay
+            _leftParticipants.Add(participantID);
 
             // Kiểm tra xem ID này có đang hiển thị không
             if (_participantVideos.ContainsKey(participantID))

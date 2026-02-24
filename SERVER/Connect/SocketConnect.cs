@@ -467,7 +467,7 @@ public class SocketConnect
 
             // 6. Gửi file
             case PackageType.SendFile:
-                _fileHandler.ForwardFile(senderSocket, package, clientKeys);
+                _fileHandler.ForwardFile(senderSocket, package, clientKeys, _socketToUser, groupMembersTable);
                 break;
 
             // 7. Yêu cầu lịch sử Chat
@@ -799,13 +799,27 @@ public class SocketConnect
     {
         try
         {
+            // Chuẩn bị thông báo ngắt kết nối cho tất cả client
+            string message = "Server đã ngắt kết nối. Chương trình sẽ tự động đóng.";
+            byte[] payload = System.Text.Encoding.UTF8.GetBytes(message);
+
             // 1. Đóng Socket của tất cả Client đang online
             lock (_socketToUser)
             {
                 // Dùng ToList() để tạo bản sao danh sách, tránh lỗi khi đang lặp mà xóa phần tử
                 foreach (var client in _socketToUser.Keys.ToList())
                 {
-                    try { client.Close(); } catch { }
+                    try
+                    {
+                        // Gửi thông báo cho Client biết Server đang tắt
+                        client.Send(new DataPackage(PackageType.Notification, payload).Pack());
+
+                        // Đợi một chút để gói tin kịp truyền đi qua mạng trước khi Socket bị đóng
+                        System.Threading.Thread.Sleep(200);
+
+                        client.Close();
+                    }
+                    catch { }
                 }
                 _socketToUser.Clear();
             }

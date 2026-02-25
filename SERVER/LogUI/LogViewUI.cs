@@ -9,6 +9,13 @@ namespace SERVER.LogUI
         private static ListView _listView;
         private static ListView _lvClient;
 
+        // Biến lưu trữ SessionID hiện tại để liên kết log với phiên làm việc cụ thể
+        public static string CurrentSessionID { get; set; } = "";
+
+
+        // Cờ xác định xem UI có đang xem Log trực tiếp không, hay đang xem quá khứ
+        public static bool IsViewingCurrentSession { get; set; } = true;
+
         public static void Initialize(ListView lv, ListView clientLv)
         {
             _listView = lv;
@@ -17,30 +24,63 @@ namespace SERVER.LogUI
 
         public static void AddLog(string message)
         {
-            // Nếu chưa khởi tạo thì thoát để tránh lỗi NullReferenceException
             if (_listView == null) return;
-
-            // Xử lý nếu được gọi từ một Thread khác với Thread UI
             if (_listView.InvokeRequired)
             {
                 _listView.Invoke(new Action(() => AddLog(message)));
                 return;
             }
 
-            // Tạo dòng thông tin mới
             string time = DateTime.Now.ToString("HH:mm:ss");
-            ListViewItem item = new ListViewItem(new[] { time, message });
 
-            // Cấu hình màu sắc
-            item.UseItemStyleForSubItems = false;
-            item.SubItems[0].ForeColor = System.Drawing.Color.ForestGreen;
-            item.SubItems[1].ForeColor = System.Drawing.Color.Black;
+            // --- CHỈ HIỂN THỊ LÊN LISTVIEW NẾU ĐANG Ở CHẾ ĐỘ 'CURRENT' ---
+            if (IsViewingCurrentSession)
+            {
+                ListViewItem item = new ListViewItem(new[] { time, message });
+                item.UseItemStyleForSubItems = false;
+                item.SubItems[0].ForeColor = System.Drawing.Color.ForestGreen;
+                item.SubItems[1].ForeColor = System.Drawing.Color.Black;
 
-            _listView.Items.Add(item);
+                _listView.Items.Add(item);
+                _listView.EnsureVisible(_listView.Items.Count - 1);
+            }
 
-            // Tự động cuộn xuống dòng cuối cùng
-            _listView.EnsureVisible(_listView.Items.Count - 1);
+            // Dù đang xem quá khứ hay hiện tại, Log mới vẫn LUÔN được đẩy xuống Database
+            if (!string.IsNullOrEmpty(CurrentSessionID))
+            {
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    SERVER.Database.DatabaseConnect dbLog = new SERVER.Database.DatabaseConnect();
+                    dbLog.SaveServerLog(CurrentSessionID, message);
+                });
+            }
         }
+
+        // ĐỂ TẢI LỊCH SỬ LOG CỦA MỘT PHIÊN LÀM VIỆC CỤ THỂ VÀO LISTVIEW
+        public static void LoadHistoryToView(List<string[]> logs)
+        {
+            if (_listView == null) return;
+            if (_listView.InvokeRequired)
+            {
+                _listView.Invoke(new Action(() => LoadHistoryToView(logs)));
+                return;
+            }
+
+            _listView.Items.Clear();
+            foreach (var log in logs)
+            {
+                ListViewItem item = new ListViewItem(new[] { log[0], log[1] });
+                item.UseItemStyleForSubItems = false;
+                item.SubItems[0].ForeColor = System.Drawing.Color.MediumBlue; // Đổi màu để nhận diện log cũ
+                item.SubItems[1].ForeColor = System.Drawing.Color.Black;
+                _listView.Items.Add(item);
+            }
+            if (_listView.Items.Count > 0)
+            {
+                _listView.EnsureVisible(_listView.Items.Count - 1);
+            }
+        }
+
 
 
         //

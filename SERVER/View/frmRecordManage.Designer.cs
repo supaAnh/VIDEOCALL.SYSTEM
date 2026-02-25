@@ -40,6 +40,7 @@
             // 
             // comboBoxRecordUser
             // 
+            comboBoxRecordUser.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             comboBoxRecordUser.FormattingEnabled = true;
             comboBoxRecordUser.Location = new Point(12, 64);
             comboBoxRecordUser.Name = "comboBoxRecordUser";
@@ -48,6 +49,7 @@
             // 
             // label1
             // 
+            label1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             label1.AutoSize = true;
             label1.Font = new Font("Segoe UI", 10F);
             label1.Location = new Point(12, 23);
@@ -58,6 +60,7 @@
             // 
             // lbRecordList
             // 
+            lbRecordList.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             lbRecordList.FormattingEnabled = true;
             lbRecordList.Location = new Point(12, 101);
             lbRecordList.Name = "lbRecordList";
@@ -66,6 +69,7 @@
             // 
             // axWindowsMediaPlayer1
             // 
+            axWindowsMediaPlayer1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             axWindowsMediaPlayer1.Enabled = true;
             axWindowsMediaPlayer1.Location = new Point(304, 64);
             axWindowsMediaPlayer1.Name = "axWindowsMediaPlayer1";
@@ -75,6 +79,7 @@
             // 
             // btnClose
             // 
+            btnClose.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             btnClose.Font = new Font("Segoe UI", 10F);
             btnClose.Location = new Point(861, 12);
             btnClose.Name = "btnClose";
@@ -85,6 +90,7 @@
             // 
             // btnChoose
             // 
+            btnChoose.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             btnChoose.Font = new Font("Segoe UI", 10F);
             btnChoose.Location = new Point(96, 480);
             btnChoose.Name = "btnChoose";
@@ -92,7 +98,6 @@
             btnChoose.TabIndex = 5;
             btnChoose.Text = "Chọn";
             btnChoose.UseVisualStyleBackColor = true;
-    
             // 
             // frmRecordManage
             // 
@@ -105,6 +110,8 @@
             Controls.Add(lbRecordList);
             Controls.Add(label1);
             Controls.Add(comboBoxRecordUser);
+            FormBorderStyle = FormBorderStyle.Fixed3D;
+            MaximizeBox = false;
             Name = "frmRecordManage";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "SERVER - Quản lý Record";

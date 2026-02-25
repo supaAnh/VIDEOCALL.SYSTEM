@@ -47,6 +47,7 @@
             // 
             // pictureBoxCamPreview
             // 
+            pictureBoxCamPreview.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             pictureBoxCamPreview.Location = new Point(12, 12);
             pictureBoxCamPreview.Name = "pictureBoxCamPreview";
             pictureBoxCamPreview.Size = new Size(414, 279);
@@ -56,6 +57,7 @@
             // 
             // btnCamera
             // 
+            btnCamera.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             btnCamera.Location = new Point(109, 297);
             btnCamera.Name = "btnCamera";
             btnCamera.Size = new Size(98, 44);
@@ -65,6 +67,7 @@
             // 
             // btnMicrophone
             // 
+            btnMicrophone.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             btnMicrophone.Location = new Point(213, 297);
             btnMicrophone.Name = "btnMicrophone";
             btnMicrophone.Size = new Size(98, 44);
@@ -74,6 +77,7 @@
             // 
             // btnExit
             // 
+            btnExit.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             btnExit.Location = new Point(659, 391);
             btnExit.Name = "btnExit";
             btnExit.Size = new Size(98, 44);
@@ -84,6 +88,7 @@
             // 
             // cbCamera
             // 
+            cbCamera.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             cbCamera.FormattingEnabled = true;
             cbCamera.Location = new Point(543, 48);
             cbCamera.Name = "cbCamera";
@@ -92,6 +97,7 @@
             // 
             // label1
             // 
+            label1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             label1.AutoSize = true;
             label1.Location = new Point(466, 51);
             label1.Name = "label1";
@@ -101,6 +107,7 @@
             // 
             // label2
             // 
+            label2.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             label2.AutoSize = true;
             label2.Location = new Point(466, 93);
             label2.Name = "label2";
@@ -110,6 +117,7 @@
             // 
             // cbOutput
             // 
+            cbOutput.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             cbOutput.FormattingEnabled = true;
             cbOutput.Location = new Point(543, 90);
             cbOutput.Name = "cbOutput";
@@ -118,6 +126,7 @@
             // 
             // label3
             // 
+            label3.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             label3.AutoSize = true;
             label3.Location = new Point(466, 184);
             label3.Name = "label3";
@@ -127,6 +136,7 @@
             // 
             // cbInput
             // 
+            cbInput.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             cbInput.FormattingEnabled = true;
             cbInput.Location = new Point(543, 181);
             cbInput.Name = "cbInput";
@@ -135,6 +145,7 @@
             // 
             // progessBarMic
             // 
+            progessBarMic.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             progessBarMic.Location = new Point(543, 228);
             progessBarMic.Name = "progessBarMic";
             progessBarMic.Size = new Size(212, 10);
@@ -142,6 +153,7 @@
             // 
             // btnOutputTest
             // 
+            btnOutputTest.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             btnOutputTest.Location = new Point(678, 124);
             btnOutputTest.Name = "btnOutputTest";
             btnOutputTest.Size = new Size(79, 40);
@@ -152,6 +164,7 @@
             // 
             // label4
             // 
+            label4.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             label4.AutoSize = true;
             label4.Location = new Point(466, 218);
             label4.Name = "label4";
@@ -161,6 +174,7 @@
             // 
             // btnJoin
             // 
+            btnJoin.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             btnJoin.Location = new Point(569, 297);
             btnJoin.Name = "btnJoin";
             btnJoin.Size = new Size(98, 44);
@@ -188,6 +202,7 @@
             Controls.Add(btnMicrophone);
             Controls.Add(btnCamera);
             Controls.Add(pictureBoxCamPreview);
+            FormBorderStyle = FormBorderStyle.Fixed3D;
             MaximizeBox = false;
             Name = "frmSelectOption";
             StartPosition = FormStartPosition.CenterScreen;

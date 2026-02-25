@@ -41,10 +41,10 @@
             // 
             // tableLayoutPanel1
             // 
+            tableLayoutPanel1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             tableLayoutPanel1.ColumnCount = 2;
             tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            tableLayoutPanel1.Dock = DockStyle.Fill;
             tableLayoutPanel1.Location = new Point(0, 0);
             tableLayoutPanel1.Name = "tableLayoutPanel1";
             tableLayoutPanel1.RowCount = 2;
@@ -55,7 +55,8 @@
             // 
             // btnExit
             // 
-            btnExit.BackColor = Color.Gainsboro;
+            btnExit.BackColor = Color.Red;
+            btnExit.ForeColor = SystemColors.ButtonHighlight;
             btnExit.Location = new Point(12, 12);
             btnExit.Name = "btnExit";
             btnExit.Size = new Size(77, 43);
@@ -82,6 +83,7 @@
             // 
             // btnCamera
             // 
+            btnCamera.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnCamera.BackColor = Color.LightGreen;
             btnCamera.Location = new Point(991, 12);
             btnCamera.Name = "btnCamera";
@@ -93,6 +95,7 @@
             // 
             // btnMicrophone
             // 
+            btnMicrophone.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnMicrophone.BackColor = Color.LightGreen;
             btnMicrophone.Location = new Point(908, 12);
             btnMicrophone.Name = "btnMicrophone";

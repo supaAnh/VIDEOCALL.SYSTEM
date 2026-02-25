@@ -92,6 +92,8 @@
             Controls.Add(txtGroupName);
             Controls.Add(checklb_ChooseUser);
             Controls.Add(label1);
+            MaximizeBox = false;
+            MinimizeBox = false;
             Name = "frmCreateGroupChat";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "CLIENT - Tạo nhóm";

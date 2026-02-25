@@ -39,6 +39,7 @@
             columnHeader3 = new ColumnHeader();
             btnClientOut = new Button();
             btnWatchRecord = new Button();
+            comboBoxIDSessionLog = new ComboBox();
             ((System.ComponentModel.ISupportInitialize)textNumPort).BeginInit();
             SuspendLayout();
             // 
@@ -62,7 +63,7 @@
             listViewHistory.Font = new Font("Segoe UI", 10F);
             listViewHistory.Location = new Point(-2, 255);
             listViewHistory.Name = "listViewHistory";
-            listViewHistory.Size = new Size(577, 290);
+            listViewHistory.Size = new Size(574, 290);
             listViewHistory.TabIndex = 1;
             listViewHistory.UseCompatibleStateImageBehavior = false;
             listViewHistory.View = System.Windows.Forms.View.Details;
@@ -148,11 +149,22 @@
             btnWatchRecord.UseVisualStyleBackColor = true;
             btnWatchRecord.Click += btnWatchRecord_Click;
             // 
+            // comboBoxIDSessionLog
+            // 
+            comboBoxIDSessionLog.DropDownStyle = ComboBoxStyle.DropDownList;
+            comboBoxIDSessionLog.FormattingEnabled = true;
+            comboBoxIDSessionLog.Location = new Point(12, 222);
+            comboBoxIDSessionLog.Name = "comboBoxIDSessionLog";
+            comboBoxIDSessionLog.Size = new Size(154, 28);
+            comboBoxIDSessionLog.TabIndex = 9;
+            comboBoxIDSessionLog.SelectedIndexChanged += comboBoxIDSessionLog_SelectedIndexChanged;
+            // 
             // frmMain
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(573, 546);
+            ClientSize = new Size(570, 546);
+            Controls.Add(comboBoxIDSessionLog);
             Controls.Add(btnWatchRecord);
             Controls.Add(btnClientOut);
             Controls.Add(listViewClientConnected);
@@ -161,8 +173,8 @@
             Controls.Add(btnConnect);
             Controls.Add(listViewHistory);
             Controls.Add(btnExit);
+            FormBorderStyle = FormBorderStyle.Fixed3D;
             MaximizeBox = false;
-            MinimizeBox = false;
             Name = "frmMain";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "SERVER";
@@ -185,5 +197,6 @@
         private ColumnHeader columnHeader2;
         private ColumnHeader columnHeader3;
         private Button btnWatchRecord;
+        private ComboBox comboBoxIDSessionLog;
     }
 }

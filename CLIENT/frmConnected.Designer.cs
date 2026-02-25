@@ -97,6 +97,7 @@
             Controls.Add(btnConnect);
             Controls.Add(label2);
             Controls.Add(label1);
+            FormBorderStyle = FormBorderStyle.Fixed3D;
             MaximizeBox = false;
             MinimizeBox = false;
             Name = "frmConnected";

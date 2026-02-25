@@ -39,6 +39,7 @@
             // 
             // lbRecordList
             // 
+            lbRecordList.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             lbRecordList.FormattingEnabled = true;
             lbRecordList.Location = new Point(12, 66);
             lbRecordList.Name = "lbRecordList";
@@ -47,15 +48,18 @@
             // 
             // label1
             // 
+            label1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             label1.AutoSize = true;
+            label1.Font = new Font("Segoe UI", 10F);
             label1.Location = new Point(12, 31);
             label1.Name = "label1";
-            label1.Size = new Size(66, 20);
+            label1.Size = new Size(75, 23);
             label1.TabIndex = 2;
             label1.Text = "Xem lại: ";
             // 
             // btnChoose
             // 
+            btnChoose.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             btnChoose.Location = new Point(110, 470);
             btnChoose.Name = "btnChoose";
             btnChoose.Size = new Size(94, 47);
@@ -65,6 +69,7 @@
             // 
             // btnReturn
             // 
+            btnReturn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnReturn.Location = new Point(887, 12);
             btnReturn.Name = "btnReturn";
             btnReturn.Size = new Size(94, 48);
@@ -74,6 +79,7 @@
             // 
             // axWindowsMediaPlayer1
             // 
+            axWindowsMediaPlayer1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             axWindowsMediaPlayer1.Enabled = true;
             axWindowsMediaPlayer1.Location = new Point(344, 66);
             axWindowsMediaPlayer1.Name = "axWindowsMediaPlayer1";
@@ -91,6 +97,7 @@
             Controls.Add(btnChoose);
             Controls.Add(label1);
             Controls.Add(lbRecordList);
+            FormBorderStyle = FormBorderStyle.Fixed3D;
             Name = "frmRecord";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "CLIENT - Record";

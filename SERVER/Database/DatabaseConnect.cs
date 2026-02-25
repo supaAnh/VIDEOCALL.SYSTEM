@@ -362,5 +362,96 @@ namespace SERVER.Database
         }
 
 
+
+        //
+        //   --- SERVER LOG ---
+        //
+        public void SaveServerLog(string sessionId, string message)
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    string query = "INSERT INTO ServerLogs (SessionID, LogTime, LogMessage) VALUES (@session, @time, @msg)";
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@session", sessionId);
+                    cmd.Parameters.AddWithValue("@time", DateTime.Now);
+                    cmd.Parameters.AddWithValue("@msg", message);
+
+                    conn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception)
+            {
+                // Nếu lỗi kết nối DB khi đang ghi Log thì cứ bỏ qua để Server không bị sập
+            }
+        }
+
+
+        /// <summary>
+        /// Lấy danh sách các Session đã lưu trong Database (kèm thời gian bắt đầu)
+        /// </summary>
+        public Dictionary<string, string> GetSessionList()
+        {
+            Dictionary<string, string> sessions = new Dictionary<string, string>();
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    // Lấy SessionID và thời gian log đầu tiên của session đó để hiển thị cho dễ nhìn
+                    string query = "SELECT SessionID, MIN(LogTime) as StartTime FROM ServerLogs GROUP BY SessionID ORDER BY StartTime DESC";
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    conn.Open();
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string sId = reader["SessionID"].ToString();
+                            DateTime sTime = Convert.ToDateTime(reader["StartTime"]);
+                            // Định dạng hiển thị: "dd/MM/yyyy HH:mm:ss - [SessionID]"
+                            string displayStr = $"{sTime.ToString("dd/MM/yyyy HH:mm:ss")} - {sId}";
+                            sessions.Add(sId, displayStr);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Không in log ra UI nếu lỗi lấy danh sách
+            }
+            return sessions;
+        }
+
+        /// <summary>
+        /// Lấy toàn bộ Log của 1 Session cụ thể
+        /// </summary>
+        public List<string[]> GetLogsBySession(string sessionId)
+        {
+            List<string[]> logs = new List<string[]>();
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    string query = "SELECT LogTime, LogMessage FROM ServerLogs WHERE SessionID = @session ORDER BY LogTime ASC";
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@session", sessionId);
+                    conn.Open();
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string time = Convert.ToDateTime(reader["LogTime"]).ToString("HH:mm:ss");
+                            string msg = reader["LogMessage"].ToString();
+                            logs.Add(new string[] { time, msg });
+                        }
+                    }
+                }
+            }
+            catch (Exception) { }
+            return logs;
+        }
+
+
     }
 }

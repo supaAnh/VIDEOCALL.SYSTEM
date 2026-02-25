@@ -16,6 +16,9 @@ namespace SERVER
         private void frmMain_Load(object sender, EventArgs e)
         {
             btnExit.Enabled = false;
+
+            // Khi Form chính được tải lên, tự động gọi hàm LoadSessionComboBox để điền dữ liệu vào ComboBox
+            LoadSessionComboBox();
         }
 
         private void btnExit_Click(object sender, EventArgs e)
@@ -99,6 +102,64 @@ namespace SERVER
             else
             {
                 MessageBox.Show("Vui lòng chọn một Client trong danh sách để ngắt kết nối!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+
+        // gọi mỗi khi mở Form hoặc sau khi đóng cửa sổ quản lý phiên làm việc để cập nhật lại danh sách phiên làm việc hiện có
+        private void LoadSessionComboBox()
+        {
+            comboBoxIDSessionLog.Items.Clear();
+            comboBoxIDSessionLog.Items.Add("Current Session"); // Mặc định ở dòng đầu tiên
+
+            SERVER.Database.DatabaseConnect db = new SERVER.Database.DatabaseConnect();
+            var sessions = db.GetSessionList();
+
+            foreach (var s in sessions)
+            {
+                comboBoxIDSessionLog.Items.Add(s.Value); // Value ở đây có dạng "Thời_gian - SessionID"
+            }
+
+            // Tự động chọn dòng đầu tiên
+            comboBoxIDSessionLog.SelectedIndex = 0;
+        }
+
+        private void comboBoxIDSessionLog_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            SERVER.Database.DatabaseConnect db = new SERVER.Database.DatabaseConnect();
+
+            if (comboBoxIDSessionLog.SelectedIndex == 0)
+            {
+                // Người dùng chọn xem Hiện tại
+                LogViewUI.IsViewingCurrentSession = true;
+
+                // Load lại toàn bộ log của session hiện hành từ DB ra ListView
+                if (!string.IsNullOrEmpty(LogViewUI.CurrentSessionID))
+                {
+                    var logs = db.GetLogsBySession(LogViewUI.CurrentSessionID);
+                    LogViewUI.LoadHistoryToView(logs);
+                }
+                else
+                {
+                    listViewHistory.Items.Clear();
+                }
+            }
+            else
+            {
+                // Người dùng chọn xem Quá khứ
+                LogViewUI.IsViewingCurrentSession = false;
+
+                string selectedText = comboBoxIDSessionLog.SelectedItem.ToString();
+
+                // Tách chuỗi theo định dạng "Thời_gian - SessionID" để lấy SessionID
+                string[] parts = selectedText.Split(new string[] { " - " }, StringSplitOptions.None);
+
+                if (parts.Length == 2)
+                {
+                    string sessionId = parts[1];
+                    var logs = db.GetLogsBySession(sessionId);
+                    LogViewUI.LoadHistoryToView(logs);
+                }
             }
         }
     }

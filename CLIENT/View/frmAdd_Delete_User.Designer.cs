@@ -71,6 +71,8 @@
             Controls.Add(btnExit);
             Controls.Add(btnChoose);
             Controls.Add(checklb_ChooseUser);
+            MaximizeBox = false;
+            MinimizeBox = false;
             Name = "frmAdd_Delete_User";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "CLIENT - Thêm/Xoá User";

@@ -31,11 +31,16 @@ public class SocketConnect
     // Xử lý file
     private SERVER.File.SendFile _fileHandler = new SERVER.File.SendFile();
 
+
+
     //
     // Khởi động Server
     //
     public void StartServer(int port)
     {
+        // TẠO SESSION ID MỚI MỖI KHI MỞ SERVER (Dùng chuỗi ngẫu nhiên duy nhất Guid)
+        LogViewUI.CurrentSessionID = Guid.NewGuid().ToString("N").ToUpper();
+
         // KIỂM TRA KẾT NỐI DATABASE NGAY KHI KHỞI TẠO
         if (db.TestConnection())
         {
@@ -46,14 +51,11 @@ public class SocketConnect
             LogViewUI.AddLog("Không thể kết nối Database!");
         }
 
-
         // Khởi tạo dictionary lưu trữ khóa AES cho từng Client
         clientKeys = new Dictionary<Socket, byte[]>();
         // Thiết lập địa chỉ IP và cổng
         IP = new IPEndPoint(IPAddress.Any, port);
         server = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-
 
         try
         {
@@ -840,6 +842,11 @@ public class SocketConnect
                 try { server.Close(); } catch { }
                 server = null;
             }
+
+            LogViewUI.AddLog("Đã tắt Server thành công.");
+
+            // 3. XÓA SESSION ID sau khi Server đã tắt hoàn toàn (Không ghi log các thao tác offline)
+            LogViewUI.CurrentSessionID = "";
         }
         catch (Exception ex)
         {

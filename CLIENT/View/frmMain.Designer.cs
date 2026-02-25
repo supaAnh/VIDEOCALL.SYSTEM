@@ -57,6 +57,7 @@
             // 
             // lvOnlineUser
             // 
+            lvOnlineUser.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             lvOnlineUser.Columns.AddRange(new ColumnHeader[] { columnHeader1 });
             lvOnlineUser.Location = new Point(13, 35);
             lvOnlineUser.Name = "lvOnlineUser";
@@ -72,6 +73,7 @@
             // 
             // label1
             // 
+            label1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             label1.AutoSize = true;
             label1.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             label1.Location = new Point(13, 9);
@@ -82,6 +84,7 @@
             // 
             // panelChooseChat
             // 
+            panelChooseChat.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             panelChooseChat.Controls.Add(btnWatchRecord);
             panelChooseChat.Controls.Add(btnSignOut);
             panelChooseChat.Controls.Add(btnCreateGroupChat);
@@ -95,6 +98,7 @@
             // 
             // btnWatchRecord
             // 
+            btnWatchRecord.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             btnWatchRecord.Location = new Point(13, 439);
             btnWatchRecord.Name = "btnWatchRecord";
             btnWatchRecord.Size = new Size(110, 40);
@@ -105,6 +109,7 @@
             // 
             // btnSignOut
             // 
+            btnSignOut.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             btnSignOut.Location = new Point(139, 439);
             btnSignOut.Name = "btnSignOut";
             btnSignOut.Size = new Size(110, 40);
@@ -115,6 +120,7 @@
             // 
             // btnCreateGroupChat
             // 
+            btnCreateGroupChat.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             btnCreateGroupChat.Location = new Point(139, 389);
             btnCreateGroupChat.Name = "btnCreateGroupChat";
             btnCreateGroupChat.Size = new Size(110, 41);
@@ -125,6 +131,7 @@
             // 
             // btnChooseTarget
             // 
+            btnChooseTarget.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             btnChooseTarget.Location = new Point(13, 389);
             btnChooseTarget.Name = "btnChooseTarget";
             btnChooseTarget.Size = new Size(110, 41);
@@ -135,6 +142,7 @@
             // 
             // panelChatBox
             // 
+            panelChatBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             panelChatBox.BackColor = Color.BlanchedAlmond;
             panelChatBox.Controls.Add(btnSelectionChatBox);
             panelChatBox.Controls.Add(btnCallVideo);
@@ -151,6 +159,7 @@
             // 
             // btnSelectionChatBox
             // 
+            btnSelectionChatBox.Anchor = AnchorStyles.Top;
             btnSelectionChatBox.BackColor = Color.OldLace;
             btnSelectionChatBox.Font = new Font("Segoe UI", 10F);
             btnSelectionChatBox.Location = new Point(567, 6);
@@ -163,6 +172,7 @@
             // 
             // btnCallVideo
             // 
+            btnCallVideo.Anchor = AnchorStyles.Top;
             btnCallVideo.BackColor = Color.OldLace;
             btnCallVideo.Font = new Font("Segoe UI", 10F);
             btnCallVideo.Location = new Point(479, 6);
@@ -175,6 +185,7 @@
             // 
             // lbTargetName
             // 
+            lbTargetName.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             lbTargetName.AutoSize = true;
             lbTargetName.Font = new Font("Segoe UI", 10F);
             lbTargetName.ForeColor = SystemColors.InactiveCaptionText;
@@ -186,6 +197,7 @@
             // 
             // btnSendFile
             // 
+            btnSendFile.Anchor = AnchorStyles.Bottom;
             btnSendFile.BackColor = Color.OldLace;
             btnSendFile.Location = new Point(582, 425);
             btnSendFile.Name = "btnSendFile";
@@ -197,6 +209,7 @@
             // 
             // btnSendChat
             // 
+            btnSendChat.Anchor = AnchorStyles.Bottom;
             btnSendChat.BackColor = Color.OldLace;
             btnSendChat.Location = new Point(508, 425);
             btnSendChat.Name = "btnSendChat";
@@ -208,6 +221,7 @@
             // 
             // txtChat
             // 
+            txtChat.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             txtChat.BackColor = Color.OldLace;
             txtChat.Location = new Point(32, 425);
             txtChat.Multiline = true;
@@ -217,6 +231,7 @@
             // 
             // labelUser
             // 
+            labelUser.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             labelUser.AutoSize = true;
             labelUser.Font = new Font("Segoe UI", 10F);
             labelUser.Location = new Point(32, 18);
@@ -227,6 +242,7 @@
             // 
             // txtChatBox
             // 
+            txtChatBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             txtChatBox.BackColor = Color.OldLace;
             txtChatBox.Location = new Point(32, 55);
             txtChatBox.Multiline = true;
@@ -266,6 +282,8 @@
             ClientSize = new Size(1003, 509);
             Controls.Add(panelChatBox);
             Controls.Add(panelChooseChat);
+            FormBorderStyle = FormBorderStyle.Fixed3D;
+            MaximizeBox = false;
             Name = "frmMain";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "CLIENT - Main";
